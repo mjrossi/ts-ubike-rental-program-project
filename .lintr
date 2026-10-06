@@ -1,0 +1,6 @@
+linters: lintr::linters_with_defaults(
+    # bare column names in dplyr/ggplot look like undefined variables to lintr
+    object_usage_linter = NULL,
+    # we keep example calls in comments
+    commented_code_linter = NULL
+  )

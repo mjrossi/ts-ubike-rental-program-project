@@ -21,6 +21,15 @@ Open the folder in VS Code and accept the recommended extensions.
 | R packages locked | `renv.lock` (restored by `just setup`) |
 | openrouteservice key | macOS Keychain: run `openrouteservice::ors_api_key("<key>")` once. An `ORS_API_KEY` env var overrides it |
 
+## Code
+
+`main.R` is the project's script. It sources the other files, which only
+define things:
+
+| File | Defines |
+|---|---|
+| `survey_codebook.R` | The survey's columns and answer labels (`survey_key`), `read_survey()`, `label_survey()` and `split_modes()` |
+
 ## Editors
 
 **VS Code**:
