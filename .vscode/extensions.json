@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "REditorSupport.r",
+    "RDebugger.r-debugger",
+    "Posit.air-vscode",
+    "hverlin.mise-vscode",
+    "nefrob.vscode-just-syntax"
+  ]
+}

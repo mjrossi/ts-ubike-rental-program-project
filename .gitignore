@@ -1,0 +1,22 @@
+# R session state
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+
+# Secrets, if ever set per-project (ORS_API_KEY normally lives in the Keychain)
+.Renviron
+
+# Render output
+*.html
+*_files/
+*_cache/
+
+# macOS
+.DS_Store
+
+# no need to commit output
+output/
+
+# win11 image
+win11/

@@ -1,0 +1,29 @@
+Type: project
+Package: ts
+Title: TS Ubike Rental Program Project
+Version: 0.0.1
+Description: The package manifest for renv. renv is in "explicit" snapshot
+    mode, so renv.lock tracks exactly the packages listed here. Everything is
+    under Imports on purpose: renv treats Suggests as dev-only and leaves them
+    out of the lockfile. Course packages come first; the rest are the course's
+    optional extras (remotes, usethis, osmextract, stplanr) and the editor
+    tooling (languageserver, for VS Code and nvim; vscDebugger, for VS Code's
+    R Debugger; jgd, for vscode-R's plot pane). Add packages with
+    `just add <pkg>` rather than editing this list by hand; for a GitHub
+    package it also records the Remotes entry.
+Depends:
+    R (>= 4.6)
+Imports:
+    sf,
+    rmarkdown,
+    openrouteservice,
+    remotes,
+    usethis,
+    osmextract,
+    stplanr,
+    desc,
+    languageserver,
+    vscDebugger,
+    jgd
+Remotes:
+    ManuelHentschel/vscDebugger

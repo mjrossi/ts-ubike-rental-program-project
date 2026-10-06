@@ -1,0 +1,25 @@
+{
+  // R from the r-app cask (CRAN's build), not anything mise-managed.
+  "r.executablePath": "/usr/local/bin/R",
+  // R Debugger still reads only the legacy key that vscode-R deprecated.
+  // Keep it until R Debugger is updated, and keep it equal to
+  // r.executablePath so both extensions run the same R.
+  "r.rpath.mac": "/usr/local/bin/R",
+  "r.consolePath": "/usr/local/bin/R",
+  "r.consoleArgs": ["--quiet", "--no-save", "--no-restore"],
+  // No r.bracketedPaste: it is for the radian console only. Plain R does not
+  // understand the paste markers and receives them as code (`00~...01~`).
+
+  // Format with the mise-pinned air (mise.toml), not the copy the extension
+  // bundles, so the editor and `just fmt` can never disagree.
+  "air.executableStrategy": "environment",
+  "[r]": {
+    "editor.defaultFormatter": "Posit.air-vscode",
+    "editor.formatOnSave": true
+  },
+
+  "files.exclude": {
+    "renv/library/": true,
+    "renv/staging/": true
+  }
+}

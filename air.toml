@@ -1,0 +1,10 @@
+# air formatter settings. These are air's defaults, written out on purpose:
+# without an air.toml, air in an editor takes indentation from the editor
+# instead, and VS Code's detectIndentation guesses it from whatever the file
+# already uses. A file that starts with 4-space indents then stays 4-space on
+# every save, while `just fmt` and lintr expect 2.
+
+[format]
+indent-style = "space"
+indent-width = 2
+line-width = 80
