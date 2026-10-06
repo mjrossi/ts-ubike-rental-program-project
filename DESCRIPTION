@@ -24,6 +24,8 @@ Imports:
     desc,
     languageserver,
     vscDebugger,
-    jgd
+    jgd,
+    readxl,
+    tidyverse
 Remotes:
     ManuelHentschel/vscDebugger
