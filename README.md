@@ -23,12 +23,15 @@ Open the folder in VS Code and accept the recommended extensions.
 
 ## Code
 
-`main.R` is the project's script. It sources the other files, which only
-define things:
+`main.R` is the project's script. `make_charts.R` draws the descriptive
+charts into `output/`. Both source the other files, which only define
+things:
 
 | File | Defines |
 |---|---|
 | `survey_codebook.R` | The survey's columns and answer labels (`survey_key`), `read_survey()`, `label_survey()` and `split_modes()` |
+| `chart_style.R` | Chart colours, legend wording, `theme_ubike()` and `save_chart()` (writes a chart to `output/` as a PNG) |
+| `plots.R` | One `plot_*()` function per chart; each takes any survey table |
 
 ## Editors
 
