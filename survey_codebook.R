@@ -1,28 +1,18 @@
-# Codebook for the UBike survey spreadsheet (TS_Project_SurveyUBike_final),
-# "Raw data" sheet: one row per respondent, one column per question.
-#
-# In the sheet, answers are numeric codes and each column header lists its
-# codes, e.g. "Q2_Role (Student-1; Faculty/Researcher-2; Staff-3)". This file
-# gives every column a short name (role) and turns coded answers into factors
-# with readable labels ("Student"), so you can write role == "Student".
-#
-# Usage (needs R 4.1 or later): source() this file, read the sheet with
-# readxl::read_excel(), and pass the result to label_survey(), which returns
-# the relabelled data.
-#
-# label_survey() stops with "Excel headers differ from survey_key" if the
-# sheet's columns aren't exactly the ones below, e.g. after someone renames,
-# adds or reorders a column. Update survey_key to match the new sheet.
-#
-# survey_key has one entry per column, in sheet order, named by its short
-# name, with
-# - header: the column's exact name in the Excel file
-# - codes:  answer label = code, copied from that header
-# - multi:  TRUE when a cell can hold several codes joined by ";" (Q14 only;
-#           it stays as text, e.g. "1;4;8")
-# Columns without codes (ID, age, counts, minutes, km, municipality) keep the
-# values read from the sheet.
+# Survey codebook --------------------------------------------------------------
+# The "Raw data" sheet stores answers as number codes and spells out what they
+# mean in each column header, like "Q2_Role (Student-1; Faculty/Researcher-2;
+# Staff-3)". label_survey() gives the columns short names (role) and swaps the
+# codes for their labels (1 becomes "Student").
 
+library(dplyr)
+library(tidyr)
+
+## survey_key ------------------------------------------------------------------
+
+# One entry per column, in the same order as the sheet. header is the exact
+# Excel column name, and codes (where a column has them) are copied from it.
+# If the sheet's columns change, label_survey() will stop with an error until
+# this list is updated to match.
 survey_key <- list(
   id = list(header = "ID"),
   role = list(
@@ -49,6 +39,8 @@ survey_key <- list(
     codes = c("no" = 1, "car" = 2, "motorbike" = 3)
   ),
   travel_time_min = list(header = "Q13_TravelTime_min"),
+  # People could pick several modes, stored like "1;4;8". This column stays
+  # as text and split_modes() handles it.
   modes = list(
     header = "Q14_Modes (combinations use \";\": 1-walk; 2-car;3-carpool;4-bus;5-ferry;6-bike;7-rail;8-metro;9-motorbike;10-shuttle;11-taxi;12-other)", # nolint: line_length_linter.
     codes = c(
@@ -64,8 +56,7 @@ survey_key <- list(
       "shuttle" = 10,
       "taxi" = 11,
       "other" = 12
-    ),
-    multi = TRUE
+    )
   ),
   intermediate_stop = list(
     header = "Q15_IntermediateStop (No-0; Children-1; OlderAdults-2; Shopping-3; Gym/Sports-4; Work-5; Other-6)", # nolint: line_length_linter.
@@ -132,21 +123,51 @@ survey_key <- list(
   speed_kmh = list(header = "Speed (km/h)")
 )
 
-# Renames the survey columns to the short names above and turns each
-# single-answer coded column into a factor with the header's labels. Q14
-# (modes) stays as text, since one cell can hold several codes.
-label_survey <- function(data, key = survey_key) {
-  headers <- vapply(key, \(entry) entry$header, "", USE.NAMES = FALSE)
-  stopifnot(
-    "Excel headers differ from survey_key" = identical(names(data), headers)
-  )
-  names(data) <- names(key)
+## label_survey() --------------------------------------------------------------
 
-  for (name in names(key)) {
-    codes <- key[[name]]$codes
-    if (!is.null(codes) && !isTRUE(key[[name]]$multi)) {
-      data[[name]] <- factor(data[[name]], codes, names(codes))
+# Takes the sheet as read by read_excel() and returns it with short column
+# names and labelled answers.
+label_survey <- function(data) {
+  # If the columns don't match survey_key exactly, the short names would end
+  # up on the wrong columns
+  headers <- c()
+  for (name in names(survey_key)) {
+    headers <- c(headers, survey_key[[name]]$header)
+  }
+  if (!identical(names(data), headers)) {
+    stop("The Excel headers differ from survey_key. Update survey_key.")
+  }
+
+  names(data) <- names(survey_key)
+
+  # modes is skipped here, see split_modes()
+  for (name in names(survey_key)) {
+    codes <- survey_key[[name]]$codes
+    if (!is.null(codes) && name != "modes") {
+      data[[name]] <- factor(
+        data[[name]],
+        levels = codes,
+        labels = names(codes)
+      )
     }
   }
+
   data
+}
+
+## split_modes() ---------------------------------------------------------------
+
+# One row per person per mode, so "1;4;8" becomes walk, bus and metro. A mode
+# someone listed twice only counts once.
+split_modes <- function(data) {
+  codes <- survey_key$modes$codes
+
+  data |>
+    select(id, modes) |>
+    separate_longer_delim(modes, delim = ";") |>
+    mutate(
+      mode = factor(as.numeric(modes), levels = codes, labels = names(codes))
+    ) |>
+    select(id, mode) |>
+    distinct()
 }

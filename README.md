@@ -21,6 +21,17 @@ Open the folder in VS Code and accept the recommended extensions.
 | R packages locked | `renv.lock` (restored by `just setup`) |
 | openrouteservice key | macOS Keychain: run `openrouteservice::ors_api_key("<key>")` once. An `ORS_API_KEY` env var overrides it |
 
+## Code
+
+`main.R` is the script to run. It sources the others, which only define
+things:
+
+| File | Defines |
+|---|---|
+| `survey_codebook.R` | The survey's columns and answer labels (`survey_key`), `label_survey()` and `split_modes()` |
+| `chart_style.R` | Chart colours, legend wording, `theme_ubike()` and `save_chart()` (writes a chart to `output/` as a PNG) |
+| `plots.R` | One `plot_*()` function per chart; each takes any survey table |
+
 ## Editors
 
 **VS Code**:
