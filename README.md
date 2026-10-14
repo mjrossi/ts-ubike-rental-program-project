@@ -33,6 +33,8 @@ things:
 | `chart_style.R` | Chart colours, legend wording, `theme_ubike()` and `save_chart()` (writes a chart to `output/` as a PNG) |
 | `plots.R` | One `plot_*()` function per chart; each takes any survey table |
 
+The project brief is `docs/project_brief.pdf`.
+
 ## Editors
 
 **VS Code**:
