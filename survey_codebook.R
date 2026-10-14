@@ -127,14 +127,15 @@ survey_key <- list(
 
 ## read_survey() ---------------------------------------------------------------
 
-# Reads the sheet and returns it labelled, ready to use. Every
+# Reads the sheet and returns it labelled and grouped, ready to use. Every
 # script starts with this, so they all work on the same table:
 #   survey <- read_survey()
 read_survey <- function(
   path = "./data/TS_Project_SurveyUBike_final (local).xlsx"
 ) {
   read_excel(path) |>
-    label_survey()
+    label_survey() |>
+    add_groups()
 }
 
 ## label_survey() --------------------------------------------------------------
@@ -167,6 +168,76 @@ label_survey <- function(data) {
   }
 
   data
+}
+
+## add_groups() ----------------------------------------------------------------
+
+# Adds the grouped columns the decision tree uses, so every script and chart
+# splits people the same way. read_survey() calls it.
+add_groups <- function(data) {
+  # One commute type per person from Q14, where people could pick several
+  # modes. Any car use wins over transit, and transit over walking or cycling.
+  profiles <- split_modes(data) |>
+    group_by(id) |>
+    summarise(
+      car = any(mode %in% c("car", "carpool", "motorbike", "taxi")),
+      transit = any(mode %in% c("bus", "metro", "rail", "ferry", "shuttle")),
+      active = any(mode %in% c("walk", "bike"))
+    ) |>
+    mutate(
+      mode_profile = factor(
+        case_when(
+          car & transit ~ "Car + transit",
+          car ~ "Car",
+          transit ~ "Transit",
+          active ~ "Walk or bike only",
+          TRUE ~ "Other"
+        ),
+        levels = c(
+          "Car",
+          "Car + transit",
+          "Transit",
+          "Walk or bike only",
+          "Other"
+        )
+      )
+    ) |>
+    select(id, mode_profile)
+
+  data |>
+    left_join(profiles, by = "id") |>
+    mutate(
+      # Distance bands of the scaffold tree (Gate 3)
+      distance_group = cut(
+        distance_km,
+        breaks = c(-Inf, 5, 10, Inf),
+        labels = c("Under 5 km", "5 to 10 km", "Over 10 km"),
+        right = FALSE # 5 km goes into "5 to 10 km"
+      ),
+      # Children under 11 often need to be taken to school (modifier)
+      young_children = if_else(
+        children_under1 + children_1to5 + children_6to10 > 0,
+        "Yes",
+        "No"
+      ),
+      # Floor in fewer groups (Gate 2a and 3b)
+      floor_group = factor(
+        case_when(
+          floor <= 0 ~ "Ground or basement",
+          floor <= 2 ~ "1st or 2nd floor",
+          floor <= 4 ~ "3rd or 4th floor",
+          TRUE ~ "Above 4th floor"
+        ),
+        levels = c(
+          "Ground or basement",
+          "1st or 2nd floor",
+          "3rd or 4th floor",
+          "Above 4th floor"
+        )
+      ),
+      # Can the person ride in the city? (Gate 1: "No" versus "Yes" or "A bit")
+      can_ride = if_else(urban_cycling == "No", "Cannot ride", "Can ride")
+    )
 }
 
 ## split_modes() ---------------------------------------------------------------
