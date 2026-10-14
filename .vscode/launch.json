@@ -1,11 +1,5 @@
 {
-  // Without this file R Debugger offers its generated configurations, and
-  // because DESCRIPTION exists one of them is "Debug R-Package". That one
-  // loads the project as a package and idles at a prompt without running the
-  // open script. DESCRIPTION is only renv's manifest, so leave it out.
-  //
-  // workingDirectory is the repo root so .Rprofile activates renv and
-  // relative paths like data/ resolve, whichever script is open.
+  // No "Debug R-Package": DESCRIPTION is only for renv
   "version": "0.2.0",
   "configurations": [
     {

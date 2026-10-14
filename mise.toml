@@ -1,17 +1,9 @@
-# Pin the project tooling. Install mise (https://mise.jdx.dev), then
-# `mise install` at the repo root provisions everything below.
-#
-# R itself is deliberately NOT here. mise has no binary R backend, and CRAN's
-# prebuilt macOS packages (sf with its bundled GDAL/PROJ/GEOS above all) only
-# work against CRAN's own R.framework. R comes from the `r-app` cask in
-# ~/dotfiles/Brewfile; R packages are pinned in renv.lock, not here.
+# R comes from the r-app cask, since CRAN's prebuilt packages (sf) need CRAN's
+# R build. R packages are pinned in renv.lock.
 
 [tools]
-# Patch-pinned so reproducibility > convenience.
 "aqua:casey/just" = "1.58.0"
-# R formatter. Full backend name: the bare registry `air` is air-verse's Go
-# live-reloader, an unrelated tool.
+# Not the bare `air`, which is an unrelated Go tool
 "github:posit-dev/air" = "0.11.0"
-# rmarkdown::render shells out to pandoc. RStudio/Positron bundle their own;
-# VS Code and nvim do not, so `just render` and the editors need this one.
+# For rmarkdown::render
 "github:jgm/pandoc" = "3.11"

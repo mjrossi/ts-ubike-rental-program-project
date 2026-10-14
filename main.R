@@ -1,8 +1,6 @@
 # UBike emission savings
-# The project's main script: from the survey to the emissions a shift to
-# cycling would save. Run it a few lines at a time (select, then Cmd+Enter).
-# The files in R/ just define the functions used here; the charts are in
-# make_charts.R.
+# From the survey to the emissions saved by a shift to cycling. The charts are
+# in make_charts.R.
 
 # Setup ------------------------------------------------------------------------
 
@@ -18,7 +16,6 @@ source("R/emissions.R") # add_main_mode(), add_current_emissions(), ...
 survey <- read_survey()
 
 # Decision tree ----------------------------------------------------------------
-# Uncomment as the functions get written.
 
 # survey <- survey |>
 #   add_tier() |>
@@ -26,19 +23,25 @@ survey <- read_survey()
 #   add_shift_probability()
 
 # Emission factors -------------------------------------------------------------
-# occupancy: average passengers per vehicle, from the course Excel file
 
-# factors <- combine_factors(
-#   read_mode_factors("./data/<course excel file>.xlsx"),
-#   copert_factors("./data/<copert output>", occupancy)
-# )
+mode_factors <- read_mode_factors(survey_path)
+# TODO: placeholder numbers until the COPERT v25 export exists
+copert_path <- "./data/copert_placeholder.csv"
+factors <- combine_factors(
+  mode_factors,
+  copert_factors(copert_path, select(mode_factors, mode, occupancy))
+)
 
 # Emissions --------------------------------------------------------------------
 
-# survey <- survey |>
-#   add_main_mode(factors) |>
-#   add_current_emissions(factors) |>
-#   add_savings()
+# TODO: one-way or round trip? Q17 asks for "the travel distance of your
+# commuting trip" and the brief (section 5) works in grams per trip, so we
+# count one trip as one-way for now. If the brief means a daily commute, use
+# trips_per_day = 2.
+survey <- survey |>
+  add_main_mode(factors) |>
+  add_current_emissions(factors, trips_per_day = 1) |>
+  add_savings()
 
-# total_savings(survey, role)
-# total_savings(survey, main_mode)
+total_savings(survey, role)
+total_savings(survey, main_mode)

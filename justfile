@@ -1,23 +1,10 @@
-# ts-ubike-rental-program-project -- common commands.
-# Run `just` (no args) to list recipes, organized by group.
-#
-# `just` itself is pinned in mise.toml; a single `mise install` provisions it
-# alongside air and pandoc. R comes from the r-app cask (see mise.toml).
-#
-# Recipes go through `mise exec --` so the pinned air and pandoc are on PATH
-# even where mise isn't shell-activated -- rmarkdown::render finds pandoc via
-# PATH. R's own startup sources .Rprofile, which activates renv, so every
-# Rscript below sees the project library rather than the user one.
+# Recipes use `mise exec --` so the pinned air and pandoc are on PATH.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
-
-# ── default ───────────────────────────────────────────
 
 [private]
 default:
     @just --list --unsorted
-
-# ── setup ─────────────────────────────────────────────
 
 # install the exact package versions in renv.lock
 [group('setup')]
@@ -40,8 +27,6 @@ doctor:
     mise exec -- Rscript -e 'cat(R.version.string, "\n"); cat("library:", .libPaths()[1], "\n"); pkgs <- desc::desc_get_deps()$package; pkgs <- setdiff(pkgs, "R"); ok <- vapply(pkgs, requireNamespace, logical(1), quietly = TRUE); print(ok); print(sf::sf_extSoftVersion()); cat("pandoc:", as.character(rmarkdown::pandoc_version()), "\n"); stopifnot(all(ok))'
     mise exec -- air --version
 
-# ── dev ───────────────────────────────────────────────
-
 # R console in the project (renv active)
 [group('dev')]
 console:
@@ -52,8 +37,6 @@ console:
 render file:
     mise exec -- Rscript -e 'rmarkdown::render("{{file}}")'
 
-# ── check ─────────────────────────────────────────────
-
 # format R code with air
 [group('check')]
 fmt:
@@ -63,3 +46,8 @@ fmt:
 [group('check')]
 fmt-check:
     mise exec -- air format --check .
+
+# run the tests in tests/testthat
+[group('check')]
+test:
+    mise exec -- Rscript -e 'testthat::test_dir("tests/testthat")'
