@@ -23,13 +23,16 @@ Open the folder in VS Code and accept the recommended extensions.
 
 ## Code
 
-`main.R` is the project's script. `make_charts.R` draws the descriptive
-charts into `output/`. Both source the other files, which only define
-things:
+`main.R` is the project's script: survey → decision tree → emission savings.
+`make_charts.R` draws the descriptive charts into `output/`. Both source the
+other files, which only define things:
 
 | File | Defines |
 |---|---|
 | `survey_codebook.R` | The survey's columns and answer labels (`survey_key`), `read_survey()`, `label_survey()`, `add_groups()` and `split_modes()` |
+| `decision_tree.R` | Tiers and their probabilities, `add_tier()`, `adjust_tier()` and `add_shift_probability()` (adds `p_shift`) |
+| `emission_factors.R` | The g/p.km factor table for every mode, from the course Excel file and COPERT |
+| `emissions.R` | `add_main_mode()`, `add_current_emissions()`, `add_savings()` and `total_savings()` |
 | `chart_style.R` | Chart colours, legend wording, `theme_ubike()` and `save_chart()` (writes a chart to `output/` as a PNG) |
 | `plots.R` | One `plot_*()` function per chart; each takes any survey table |
 
