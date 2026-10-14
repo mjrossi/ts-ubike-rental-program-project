@@ -1,17 +1,17 @@
 # UBike emission savings
 # The project's main script: from the survey to the emissions a shift to
 # cycling would save. Run it a few lines at a time (select, then Cmd+Enter).
-# The other .R files just define the functions used here; the charts are in
+# The files in R/ just define the functions used here; the charts are in
 # make_charts.R.
 
 # Setup ------------------------------------------------------------------------
 
 library(dplyr)
 
-source("survey_codebook.R") # read_survey(), column names and answer labels
-source("decision_tree.R") # add_tier(), adjust_tier(), add_shift_probability()
-source("emission_factors.R") # the g/p.km table for every mode
-source("emissions.R") # add_main_mode(), add_current_emissions(), ...
+source("R/survey_codebook.R") # read_survey(), column names and answer labels
+source("R/decision_tree.R") # add_tier(), adjust_tier(), add_shift_probability()
+source("R/emission_factors.R") # the g/p.km table for every mode
+source("R/emissions.R") # add_main_mode(), add_current_emissions(), ...
 
 # Data -------------------------------------------------------------------------
 

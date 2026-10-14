@@ -7,9 +7,9 @@
 library(dplyr)
 library(forcats)
 
-source("survey_codebook.R") # read_survey(), column names and answer labels
-source("chart_style.R") # colours and theme for the charts
-source("plots.R") # the plot_*() functions
+source("R/survey_codebook.R") # read_survey(), column names and answer labels
+source("R/chart_style.R") # colours and theme for the charts
+source("R/plots.R") # the plot_*() functions
 
 # Data -------------------------------------------------------------------------
 
