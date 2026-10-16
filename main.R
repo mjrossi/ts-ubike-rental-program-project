@@ -7,7 +7,8 @@
 library(dplyr)
 
 source("R/survey_codebook.R") # read_survey(), column names and answer labels
-source("R/decision_tree.R") # add_tier(), adjust_tier(), add_shift_probability()
+source("R/decision_tree.R") # shift_model(), score_shift(), compare_models()
+source("R/trees.R") # model_v1, model_v2, model_brief and their parts
 source("R/emission_factors.R") # the g/p.km table for every mode
 source("R/emissions.R") # add_main_mode(), add_current_emissions(), ...
 
@@ -17,10 +18,20 @@ survey <- read_survey()
 
 # Decision tree ----------------------------------------------------------------
 
-# survey <- survey |>
-#   add_tier() |>
-#   adjust_tier() |>
-#   add_shift_probability()
+# Mean p_shift and people per tier for each model. To try a change, see the
+# top of R/trees.R.
+compare_models(
+  survey,
+  list(v1 = model_v1, v2 = model_v2, brief = model_brief)
+)
+
+# TODO: model_v1 or model_v2? model_brief is the brief's scaffold.
+model <- model_v1
+survey <- score_shift(survey, model)
+
+# People per gate and leaf, against the diagram
+tree_table(model$tree, survey$path)
+count(survey, base_tier, tier)
 
 # Emission factors -------------------------------------------------------------
 

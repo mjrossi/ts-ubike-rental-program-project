@@ -9,9 +9,8 @@ Brief references are to `docs/project_brief.pdf`.
 
 ```r
 survey <- read_survey() |>           # R/survey_codebook.R
-  add_tier() |>                      # R/decision_tree.R
-  adjust_tier() |>
-  add_shift_probability() |>         # p_shift
+  score_shift(model_v1) |>           # p_shift. R/decision_tree.R, model
+                                     # from R/trees.R
   add_main_mode(factors) |>          # R/emissions.R
   add_current_emissions(factors) |>
   add_savings()
@@ -123,18 +122,99 @@ trip", and the brief (section 5) works in grams per trip. See
 
 ## 3. Probability of shifting
 
-`p_shift` comes from the decision tree (brief, section 4 and Figure 1). It
-isn't written yet: the structure, tiers and scaffold probabilities are in
-`R/decision_tree.R`.
+$$
+p_{shift} = M[\text{tier}, \text{Q23}], \quad
+M[t, w] = P_{tier}(t) \times P_{willingness}(w) \text{ to start}
+$$
 
-| Tier | Very low | Low | Moderate | Mod-high | High |
+The decision tree places each person in a tier from their circumstances,
+leaving out their stated willingness (brief, section 4). $p_{shift}$ is then
+the cell of the probability matrix $M$ (`shift_probabilities` in
+`R/trees.R`) for their tier and Q23 answer. $M$ starts as the product of the
+two tables below, and any cell can be set by hand.
+
+| Tier | Very low | Low | Moderate | High | Very high |
 |---|---|---|---|---|---|
-| Scaffold P | 0.05 | 0.20 | 0.40 | 0.60 | 1.00 |
+| $P_{tier}$ | 0.05 | 0.20 | 0.40 | 0.60 | 1.00 |
 
-- `adjust_tier()` moves a tier up or down one step for the modifiers. The
-  brief asks for at least two.
-- `add_shift_probability()` combines the tier with a weight for each Q23
-  answer. The weights, and how the two combine, are still to be decided.
+| Q23 | Not interested | Unsure | Yes, if electric | Yes, any bike |
+|---|---|---|---|---|
+| $P_{willingness}$ | 0.05 | 0.30 | 0.70 | 1.00 |
+
+Nobody gets 0: the lowest $p_{shift}$ is $0.05 \times 0.05 = 0.0025$.
+`check_matrix()` stops on a cell outside 0 to 1, and warns if $p_{shift}$
+falls as the tier or willingness rises (the brief asks for coherent
+probabilities, section 6, criterion 2).
+
+### The model
+
+A shift model has four parts, each in `R/trees.R` and each swappable on its
+own: a tree, an optional adjustment (`tree_v1`'s Gate 3), modifiers picked by
+name from `modifier_library`, and the matrix. `shift_model()` checks and
+bundles them, `score_shift()` runs one, and `compare_models()` lists the mean
+$p_{shift}$ and the people per tier for several side by side.
+
+| Model | Tree | Adjustment | Modifiers |
+|---|---|---|---|
+| `model_v1` | `tree_v1` | Gate 3, `trip_chain_v1` | no parking, age 50+ |
+| `model_v2` | `tree_v2` | None | escort stop, age 50+ |
+| `model_brief` | `tree_brief` | None | None |
+
+### The trees
+
+The trees are tables in `R/trees.R`, and `R/decision_tree.R` walks them. Each
+tree lists its gates (the question and the column it reads), its branches (one
+row per answer, leading to a gate or a leaf) and its leaves (a tier). A
+`reason` column next to each gate, leaf, Gate 3 value and modifier holds the
+justification against the Hierarchy of Cycling Needs.
+
+| Tree | Gates | After the tree, in its model |
+|---|---|---|
+| `tree_v1` | Distance (Q17); urban cycling (Q20); if 15 km+ and able to cycle, rail, metro or ferry (Q14) | Gate 3, trip chain (Q15 × Q12, children's ages Q7–Q11): caps or one tier down. Modifiers: no bike parking (Q21), age 50+ (Q4) |
+| `tree_v2` | Distance (Q17); urban cycling (Q20); bike parking (Q21) for everyone under 5 km and for those who cycle at 5 to 15 km; rail, metro or ferry (Q14) for those who cycle at 15 km+ | Modifiers: escort stop (Q15 children or older adults), age 50+ (Q4) |
+| `tree_brief` | The brief's Figure 1 scaffold, for comparison | None |
+
+### Adjusting the tier
+
+`adjust_tier()` changes the tree's tier in this order, staying within Very
+low to Very high at each step:
+
+1. Gate 3's step (`tree_v1`: one tier down for shopping by car or motorbike,
+   or for escorting only children aged 11+).
+2. The modifiers: one tier per modifier that applies, net at most one tier.
+   Gate 3's step doesn't count toward this limit.
+3. Gate 3's cap (`tree_v1`: at most Very low for 2+ children under 11 or
+   older adults, at most Low for one child under 11). The cap applies
+   last, so it's a true maximum.
+
+The brief asks for ±1-tier modifiers. Gate 3's caps can move someone further
+(Very high to Very low), so they need their own justification.
+
+### Answers the gates read
+
+`add_groups()` (R/survey_codebook.R, run by `read_survey()`) derives every
+gate's and modifier's input, so the thresholds are in one place. A blank
+answer stays blank (except Q20's), and the model stops on it and names the
+ids rather than guess. Only Q20 has blanks today.
+
+- Distance bands: under 5, 5 to 15, and 15 km or more (`[0, 5)`, `[5, 15)`,
+  `[15, ∞)`). `tree_brief` uses Figure 1's under 5, 5 to 10, and over 10 km.
+- The 2 blank Q20 answers count as "No", as in the group's diagrams.
+- Bike parking: any answer to Q21 other than "No".
+- Rail, metro or ferry: any of the three in Q14.
+- Trip chain: shopping counts as a vehicle trip only for car or motorbike
+  commuters (Q12). Shopping on foot or by transit is left unchanged.
+- Gate 3 (`tree_v1`) is one column, `trip_chain`, with a row per value in
+  the tree. 8 people escort children but list none in Q7–Q11. They're treated
+  as "1 child under 11", as in the diagram.
+- `tree_brief` thresholds that Figure 1 leaves open: a low floor is the 2nd
+  or below (Q22); car-light means a commute that isn't only by car;
+  confident means Q20 "Yes". Gate 3a's High is for people with one of
+  confidence or parking.
+
+`tree_table(tree, survey$path)` lists each gate and leaf with its label,
+reason and number of people, ready for the slides. Each person's `path`
+column shows the route that put them in their tier.
 
 ## 4. Savings
 
@@ -159,9 +239,14 @@ every mode) but save no emissions, since their factors are 0.
 - **COPERT export.** Car and motorbike factors are placeholders
   (`data/copert_placeholder.csv`). The brief names COPERT 5.3, while the
   `main.R` TODO says v25: confirm which.
-- **Decision tree.** Gates, leaf probabilities, at least two modifiers, Q23
-  weights and how they combine. Each gate needs a reason based on the
-  Hierarchy of Cycling Needs.
+- **Decision tree.** `model_v1` or `model_v2` (`main.R` uses `model_v1`). The
+  brief's ±1-tier modifiers are children, stops, travel time or campus:
+  `model_v2`'s escort stop fits that, while `model_v1` treats children and
+  stops as Gate 3 caps and uses bike parking as a modifier. The
+  `reason` cells in `R/trees.R` are TODOs: each gate, leaf and modifier needs a
+  reason based on the Hierarchy of Cycling Needs. Decide whether `tree_v1`'s
+  Gate 3 caps stay as caps or become one-tier steps (see
+  [Adjusting the tier](#adjusting-the-tier)).
 
 ## 6. Limitations
 

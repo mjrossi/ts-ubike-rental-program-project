@@ -29,8 +29,9 @@ files in `R/`, which only define things:
 
 | File | Defines |
 |---|---|
-| `R/survey_codebook.R` | The survey's columns and answer labels (`survey_key`), `read_survey()`, `label_survey()`, `add_groups()` and `split_modes()` |
-| `R/decision_tree.R` | Tiers and their probabilities, `add_tier()`, `adjust_tier()` and `add_shift_probability()` (adds `p_shift`) |
+| `R/survey_codebook.R` | The survey's columns and answer labels (`survey_key`), `read_survey()`, `label_survey()`, `add_groups()` (grouped columns, including the ones the decision tree reads) and `split_modes()` |
+| `R/decision_tree.R` | The machinery that runs a shift model: `shift_model()`, `score_shift()` (adds `p_shift`), `compare_models()`, `tree_table()`, and the steps `add_tier()`, `adjust_tier()` and `add_shift_probability()` |
+| `R/trees.R` | Each shift model's parts as tables: the probability matrix, the trees, Gate 3, the modifiers, and the models built from them (`model_v1`, `model_v2`, `model_brief`). Edit these to change a model |
 | `R/emission_factors.R` | The g/p.km factor table for every mode, from the course Excel file and COPERT |
 | `R/emissions.R` | `add_main_mode()`, `add_current_emissions()`, `add_savings()` and `total_savings()` |
 | `R/chart_style.R` | Chart colours, legend wording, `theme_ubike()` and `save_chart()` (writes a chart to `output/` as a PNG) |

@@ -27,6 +27,11 @@ doctor:
     mise exec -- Rscript -e 'cat(R.version.string, "\n"); cat("library:", .libPaths()[1], "\n"); pkgs <- desc::desc_get_deps()$package; pkgs <- setdiff(pkgs, "R"); ok <- vapply(pkgs, requireNamespace, logical(1), quietly = TRUE); print(ok); print(sf::sf_extSoftVersion()); cat("pandoc:", as.character(rmarkdown::pandoc_version()), "\n"); stopifnot(all(ok))'
     mise exec -- air --version
 
+# run main.R: survey, decision tree, emission savings
+[group('dev')]
+run:
+    mise exec -- Rscript main.R
+
 # R console in the project (renv active)
 [group('dev')]
 console:
