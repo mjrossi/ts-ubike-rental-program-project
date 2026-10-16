@@ -1,5 +1,5 @@
 # Chart style ------------------------------------------------------------------
-# Colours, sizes and the theme shared by every chart in plots.R.
+# Colours, sizes and theme for plots.R.
 
 library(ggplot2)
 
@@ -13,8 +13,7 @@ background_colour <- "#fcfcfb"
 grid_colour <- "#e1e0d9"
 bar_colour <- "#2a78d6" # for charts with a single colour
 
-# Q23 answers, going from light to dark blue as the answer gets more positive.
-# The names have to match the labels in survey_codebook.R.
+# Q23 answers, darker as they get more positive. Names match the Q23 labels.
 willingness_colours <- c(
   "Not Interested" = "#86b6ef",
   "Unsure" = "#3987e5",
@@ -22,7 +21,7 @@ willingness_colours <- c(
   "Yes_all bikes" = "#104281"
 )
 
-# The same answers, reworded for the legend
+# Legend wording
 willingness_legend <- c(
   "Not interested",
   "Unsure",
@@ -34,17 +33,14 @@ willingness_legend <- c(
 
 label_size <- 3.3 # values on bars, in mm
 
-# 0.315 becomes "32%". Shares too small to round to 1% show as "<1%".
-# (scales::percent() borrows percent() from the scales package without
-# loading the whole thing with library().)
+# 0.315 -> "32%", and anything under 1% -> "<1%"
 percent_label <- function(x) {
   ifelse(x > 0 & x < 0.01, "<1%", scales::percent(x, accuracy = 1))
 }
 
 ## Theme -----------------------------------------------------------------------
 
-# grid says which gridlines to keep: "x", "y" or "both". Horizontal bar charts
-# want "x", vertical ones "y".
+# grid: which gridlines to keep ("x", "y" or "both")
 theme_ubike <- function(grid = "both") {
   ubike_theme <- theme_minimal(base_size = 12) +
     theme(
@@ -52,7 +48,6 @@ theme_ubike <- function(grid = "both") {
       plot.title = element_text(colour = text_dark, face = "bold"),
       plot.subtitle = element_text(colour = text_grey),
       plot.caption = element_text(colour = text_light, hjust = 0),
-      # line the title and caption up with the chart's left edge, not the axis
       plot.title.position = "plot",
       plot.caption.position = "plot",
       axis.text = element_text(colour = text_grey),
@@ -63,7 +58,7 @@ theme_ubike <- function(grid = "both") {
       legend.justification = "left",
       legend.text = element_text(colour = text_grey),
       legend.title = element_blank(),
-      # extra room on the right so the last axis label ("100%") isn't cut off
+      # Room for the last axis label ("100%")
       plot.margin = margin(8, 16, 8, 8)
     )
 
@@ -79,17 +74,16 @@ theme_ubike <- function(grid = "both") {
 
 ## Saving ----------------------------------------------------------------------
 
-# Saves a chart to output/<name>.png and hands the chart back unchanged, so it
-# still shows up when you run the line in the console:
+# Saves to output/<name>.png at a fixed size and returns the plot, so it still
+# prints:
 #   plot_modes(survey) |> save_chart("modes")
-# A fixed size keeps the PNGs identical however the script is run.
 save_chart <- function(plot, name, width = 8, height = 5) {
   dir.create("output", showWarnings = FALSE)
   ggsave(
     file.path("output", paste0(name, ".png")),
     plot,
     width = width,
-    height = height, # inches
+    height = height,
     dpi = 300
   )
   plot

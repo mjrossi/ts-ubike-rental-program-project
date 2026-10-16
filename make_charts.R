@@ -1,6 +1,5 @@
 # UBike survey charts
-# Draws the descriptive charts and saves each one to output/ as a PNG. Run it a
-# few lines at a time (select, then Cmd+Enter), or all at once.
+# Draws the descriptive charts and saves them to output/.
 
 # Setup ------------------------------------------------------------------------
 
@@ -15,14 +14,10 @@ source("R/plots.R") # the plot_*() functions
 
 survey <- read_survey()
 
-# Just the students. fct_match() works like == but stops with an error on a
-# typo ("Studnet") instead of quietly returning zero rows.
 students <- survey |>
   filter(fct_match(role, "Student"))
 
 # Charts -----------------------------------------------------------------------
-# These all take any survey table, so plot_modes(students) works too.
-# save_chart() also writes each one to output/ as a PNG.
 
 plot_willingness_by(survey, role, "Willingness to use UBike, by role") |>
   save_chart("willingness_by_role")
@@ -73,10 +68,8 @@ plot_histogram(
 ) |>
   save_chart("travel_time")
 
-# The few very long commutes would squash the rest, so the axis stops at 60 km
-# and the caption says how many are off the chart. Most Lisboa residents have
-# exactly 3.5 km in the data, which is the spike in the 2-4 km bar.
-# (The brackets matter: without them, |> would run before the + additions.)
+# Cut at 60 km so a few long commutes don't squash the rest. The 2-4 km spike
+# is Lisboa residents, most of whom have exactly 3.5 km.
 far_away <- sum(survey$distance_km > 60)
 (plot_histogram(
   survey,

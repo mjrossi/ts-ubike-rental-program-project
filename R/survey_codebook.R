@@ -1,9 +1,7 @@
 # Survey codebook --------------------------------------------------------------
-# The "Raw data" sheet stores answers as number codes and spells out what they
-# mean in each column header, like "Q2_Role (Student-1; Faculty/Researcher-2;
-# Staff-3)". label_survey() gives the columns short names (role) and swaps the
-# codes for their labels (1 becomes "Student"). read_survey() does all of it in
-# one go.
+# The sheet stores answers as codes, explained in each header, e.g.
+# "Q2_Role (Student-1; Faculty/Researcher-2; Staff-3)". read_survey() renames
+# the columns and swaps the codes for labels.
 
 library(dplyr)
 library(readxl)
@@ -11,10 +9,8 @@ library(tidyr)
 
 ## survey_key ------------------------------------------------------------------
 
-# One entry per column, in the same order as the sheet. header is the exact
-# Excel column name, and codes (where a column has them) are copied from it.
-# If the sheet's columns change, label_survey() will stop with an error until
-# this list is updated to match.
+# One entry per sheet column, in order: the exact header, plus its codes if it
+# has any. label_survey() errors if the sheet stops matching.
 survey_key <- list(
   id = list(header = "ID"),
   role = list(
@@ -41,8 +37,7 @@ survey_key <- list(
     codes = c("no" = 1, "car" = 2, "motorbike" = 3)
   ),
   travel_time_min = list(header = "Q13_TravelTime_min"),
-  # People could pick several modes, stored like "1;4;8". This column stays
-  # as text and split_modes() handles it.
+  # Several modes per person, like "1;4;8". Left as text for split_modes().
   modes = list(
     header = "Q14_Modes (combinations use \";\": 1-walk; 2-car;3-carpool;4-bus;5-ferry;6-bike;7-rail;8-metro;9-motorbike;10-shuttle;11-taxi;12-other)", # nolint: line_length_linter.
     codes = c(
@@ -108,8 +103,7 @@ survey_key <- list(
       "Unsheltered" = 4
     )
   ),
-  # Kept as a number, since floors are ordered: 0 is ground, -1 and -2 are
-  # basement levels, 1-4 are floors and 5 means above the 4th floor.
+  # Kept as a number: -2 to 4, with 5 meaning above the 4th floor
   floor = list(header = "Q22_Floor (ground-0; basement -1/-2; >4th floor-5)"),
   willingness = list(
     header = "Q23_Willingness (Not Interested - 1; Unsure - 2; Yes_electric - 3; Yes_all bikes - 4)", # nolint: line_length_linter.
@@ -120,19 +114,18 @@ survey_key <- list(
       "Yes_all bikes" = 4
     )
   ),
-  # Precomputed in the sheet as distance_km / travel_time_min * 60. IDs 643
-  # and 846 don't match that formula.
+  # distance_km / travel_time_min * 60, from the sheet. IDs 643 and 846 don't
+  # match it.
   speed_kmh = list(header = "Speed (km/h)")
 )
 
 ## read_survey() ---------------------------------------------------------------
 
-# Reads the sheet and returns it labelled and grouped, ready to use. Every
-# script starts with this, so they all work on the same table:
-#   survey <- read_survey()
-read_survey <- function(
-  path = "./data/TS_Project_SurveyUBike_final (local).xlsx"
-) {
+# The workbook with the survey and the "Emission factors" sheet
+survey_path <- "./data/TS_Project_SurveyUBike_final (local).xlsx"
+
+# Reads, labels and groups the survey. Every script starts with this.
+read_survey <- function(path = survey_path) {
   read_excel(path) |>
     label_survey() |>
     add_groups()
@@ -140,22 +133,22 @@ read_survey <- function(
 
 ## label_survey() --------------------------------------------------------------
 
-# Takes the sheet as read by read_excel() and returns it with short column
-# names and labelled answers.
+# Short column names and labelled answers.
 label_survey <- function(data) {
-  # If the columns don't match survey_key exactly, the short names would end
-  # up on the wrong columns
-  headers <- c()
-  for (name in names(survey_key)) {
-    headers <- c(headers, survey_key[[name]]$header)
-  }
+  # Otherwise the names would land on the wrong columns
+  headers <- vapply(
+    survey_key,
+    \(key) key$header,
+    character(1),
+    USE.NAMES = FALSE
+  )
   if (!identical(names(data), headers)) {
     stop("The Excel headers differ from survey_key. Update survey_key.")
   }
 
   names(data) <- names(survey_key)
 
-  # modes is skipped here, see split_modes()
+  # modes stays as text (see split_modes())
   for (name in names(survey_key)) {
     codes <- survey_key[[name]]$codes
     if (!is.null(codes) && name != "modes") {
@@ -172,11 +165,9 @@ label_survey <- function(data) {
 
 ## add_groups() ----------------------------------------------------------------
 
-# Adds the grouped columns the decision tree uses, so every script and chart
-# splits people the same way. read_survey() calls it.
+# Grouped columns for the decision tree and charts.
 add_groups <- function(data) {
-  # One commute type per person from Q14, where people could pick several
-  # modes. Any car use wins over transit, and transit over walking or cycling.
+  # One commute type per person: car beats transit, transit beats walk/bike
   profiles <- split_modes(data) |>
     group_by(id) |>
     summarise(
@@ -207,20 +198,20 @@ add_groups <- function(data) {
   data |>
     left_join(profiles, by = "id") |>
     mutate(
-      # Distance bands of the scaffold tree (Gate 3)
+      # Gate 3 bands
       distance_group = cut(
         distance_km,
         breaks = c(-Inf, 5, 10, Inf),
         labels = c("Under 5 km", "5 to 10 km", "Over 10 km"),
         right = FALSE # 5 km goes into "5 to 10 km"
       ),
-      # Children under 11 often need to be taken to school (modifier)
+      # Under-11s often need a school run (modifier)
       young_children = if_else(
         children_under1 + children_1to5 + children_6to10 > 0,
         "Yes",
         "No"
       ),
-      # Floor in fewer groups (Gate 2a and 3b)
+      # Gates 2a and 3b
       floor_group = factor(
         case_when(
           floor <= 0 ~ "Ground or basement",
@@ -235,15 +226,14 @@ add_groups <- function(data) {
           "Above 4th floor"
         )
       ),
-      # Can the person ride in the city? (Gate 1: "No" versus "Yes" or "A bit")
+      # Gate 1: "A bit" counts as can ride
       can_ride = if_else(urban_cycling == "No", "Cannot ride", "Can ride")
     )
 }
 
 ## split_modes() ---------------------------------------------------------------
 
-# One row per person per mode, so "1;4;8" becomes walk, bus and metro. A mode
-# someone listed twice only counts once.
+# One row per person per mode ("1;4;8" -> walk, bus, metro), without repeats.
 split_modes <- function(data) {
   codes <- survey_key$modes$codes
 

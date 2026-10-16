@@ -4,7 +4,7 @@
 
 ```fish
 brew install --cask r-app   # R 4.6.1, CRAN build (in ~/dotfiles/Brewfile)
-mise install                # just, air, pandoc -- pinned in mise.toml
+mise install                # just, air, pandoc (mise.toml)
 just setup                  # course packages, pinned in renv.lock
 just doctor                 # R, sf's GDAL/GEOS/PROJ, pandoc, air
 ```
@@ -23,7 +23,7 @@ Open the folder in VS Code and accept the recommended extensions.
 
 ## Code
 
-`main.R` is the project's script: survey → decision tree → emission savings.
+`main.R` is the project's script: survey, decision tree, emission savings.
 `make_charts.R` draws the descriptive charts into `output/`. Both source the
 files in `R/`, which only define things:
 
@@ -36,7 +36,8 @@ files in `R/`, which only define things:
 | `R/chart_style.R` | Chart colours, legend wording, `theme_ubike()` and `save_chart()` (writes a chart to `output/` as a PNG) |
 | `R/plots.R` | One `plot_*()` function per chart; each takes any survey table |
 
-The project brief is `docs/project_brief.pdf`.
+The project brief is `docs/project_brief.pdf`. `docs/methods.md` has the
+equations, sources and assumptions behind `main.R`, for the slides.
 
 ## Editors
 
@@ -45,17 +46,13 @@ The project brief is `docs/project_brief.pdf`.
 - The R language server provides hover and completion.
 - air formats on save.
 - `F5` runs the open script under R Debugger ("Debug R-File" in
-  `.vscode/launch.json`) and stops at breakpoints. Its `vscDebugger` package
-  is in renv.lock. When paused, inspect data with `dplyr::glimpse()` in the
-  Debug Console.
-- The **R Workspace** view in the sidebar is RStudio's Environment pane for
-  the R terminal: each data frame's view icon opens it in the data viewer.
-  It shows the terminal's objects, never the debugger's.
-- `View()` and the Workspace view work only at the R terminal's top-level `>`
-  prompt. They fail in the Debug Console and at a `Browse[1]>` prompt, because
-  the viewer's callbacks only run at the top level. To browse data mid-script,
-  select the lines up to that point and press `Cmd+Enter`. At a `browser()`
-  stop, press `Q` first: the objects created so far stay in the workspace.
+  `.vscode/launch.json`) and stops at breakpoints.
+- The **R Workspace** view in the sidebar works like RStudio's Environment
+  pane, for the R terminal only.
+- `View()` and the Workspace view only work at the R terminal's `>` prompt,
+  not in the Debug Console or at `Browse[1]>`. To look at data mid-script, run
+  the lines up to that point with `Cmd+Enter`, or press `Q` at a `browser()`
+  stop first.
 
 **Neovim**, in R buffers only:
 

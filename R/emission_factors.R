@@ -1,46 +1,165 @@
 # Emission factors -------------------------------------------------------------
-# Grams emitted per passenger-km (g/p.km) for each commute mode, over the energy
-# lifecycle (well-to-wheel). Brief, section 4 and the notes in section 5.
-#
-# Every function here works towards one table, with a row per mode (and per
-# fuel for cars) and a column per gas:
+# Well-to-wheel factors in g/p.km (brief, sections 4 and 5), as one table:
 #   mode, fuel, co2, ch4, n2o, co2eq, nox, pm
-# mode uses the Q14 labels from survey_codebook.R ("car", "bus", ...). fuel is
-# NA except for cars, where it uses the Q18 labels ("Diesel", "Petrol", ...).
+# mode uses the Q14 labels. fuel uses the Q18 labels for the COPERT modes (car,
+# carpool, taxi, motorbike) and is NA for the rest.
+#
+#   modes <- read_mode_factors(path)
+#   factors <- combine_factors(
+#     modes,
+#     copert_factors(copert_path, select(modes, mode, occupancy))
+#   )
 
 library(dplyr)
+library(readr)
+library(readxl)
+
+# Gas columns, in table order
+gases <- c("co2", "ch4", "n2o", "co2eq", "nox", "pm")
 
 ## read_mode_factors() ---------------------------------------------------------
 
-# Bus, rail, metro, ferry and the IST shuttle, from the course Excel file. Its
-# factors are per vehicle-km, so each is divided by the mode's average
-# occupancy (also in that file) to get g/p.km.
+# Sheet row names -> Q14 labels
+sheet_modes <- c(
+  "Bus (urban, diesel)" = "bus",
+  "Ferry (Transtejo/Soflusa)" = "ferry",
+  "Rail (suburban, electric)" = "rail",
+  "Metro (Lisboa, electric)" = "metro",
+  "IST Shuttle (minibus diesel)" = "shuttle",
+  "Carpool (car, 2.5 occ.)" = "carpool",
+  "Taxi (car, 1.4 occ.)" = "taxi",
+  "Car (1.6 occ.)" = "car",
+  "Motorbike / Scooter" = "motorbike",
+  "Walking" = "walk",
+  "Cycling (target mode)" = "bike"
+)
+
+# The workbook's "Emission factors" sheet, already in g/p.km. The car,
+# carpool and taxi rows are blank; COPERT replaces them and the motorbike row.
+# occupancy is kept for copert_factors().
 read_mode_factors <- function(path) {
-  stop("read_mode_factors() is not written yet")
+  sheet <- read_excel(path, sheet = "Emission factors", skip = 2)
+
+  unknown <- setdiff(sheet$Mode, names(sheet_modes))
+  if (length(unknown) > 0) {
+    stop("Unknown rows in the Emission factors sheet: ", toString(unknown))
+  }
+
+  sheet |>
+    transmute(
+      mode = unname(sheet_modes[Mode]),
+      co2 = CO2_g_pkm,
+      ch4 = CH4_g_pkm,
+      n2o = N2O_g_pkm,
+      nox = NOx_g_pkm,
+      pm = PM_g_pkm,
+      occupancy = Occupancy
+    )
 }
 
 ## copert_factors() ------------------------------------------------------------
 
-# Cars (one row per Q18 fuel type) and motorbikes, from a COPERT 5.3 run.
-# COPERT gives g/vehicle-km at the exhaust, so this adds the fuel's upstream
-# (well-to-tank) share and divides by occupancy. Carpool and taxi reuse the
-# car rows with their own occupancy.
+# Upstream (well-to-tank) emissions: JRC (2021) via L4 slide 69, and lower
+# heating values (JEC). LPG isn't on the slide, so it borrows petrol's.
+fuel_upstream <- tribble(
+  ~fuel    , ~mj_per_kg , ~wtt_g_per_mj ,
+  "Diesel" , 43.1       , 18.9          ,
+  "Petrol" , 43.2       , 17.0          ,
+  "LPG"    , 46.0       , 17.0
+)
+
+# Portugal's grid in 2023, in g CO2eq per kWh generated (EEA, greenhouse gas
+# emission intensity of electricity generation). Leaves out grid losses and
+# the upstream emissions of the fuels burnt.
+# https://www.eea.europa.eu/en/analysis/indicators/greenhouse-gas-emission-intensity-of-1-1751032678/greenhouse-gas-emission-intensity-of-electricity-generation-country-level # nolint: line_length_linter.
+grid_g_per_kwh <- 119
+
+# Which survey modes each COPERT vehicle covers
+vehicle_modes <- tribble(
+  ~vehicle    , ~mode       ,
+  "car"       , "car"       ,
+  "car"       , "carpool"   ,
+  "car"       , "taxi"      ,
+  "motorbike" , "motorbike"
+)
+
+# Car and motorbike rows from a COPERT export: one row per vehicle and fuel,
+# with fuel_g_km (kwh_km for Electric), co2, ch4, n2o, nox and pm in g/vkm.
+# Adds upstream emissions, then divides by each mode's occupancy to get g/p.km.
+# Upstream is only given as CO2eq, so it goes into co2, as the workbook does
+# for electric rail and metro: co2eq stays right, but co2 carries a little
+# upstream CH4 and N2O.
 copert_factors <- function(path, occupancy) {
-  stop("copert_factors() is not written yet")
+  copert <- read_csv(path, show_col_types = FALSE)
+
+  unknown <- c(
+    setdiff(copert$vehicle, vehicle_modes$vehicle),
+    setdiff(copert$fuel, c(fuel_upstream$fuel, "Electric"))
+  )
+  if (length(unknown) > 0) {
+    stop("Unknown vehicles or fuels in the COPERT file: ", toString(unknown))
+  }
+
+  missing <- setdiff(vehicle_modes$vehicle, copert$vehicle)
+  if (length(missing) > 0) {
+    stop("No rows in the COPERT file for: ", toString(missing))
+  }
+
+  copert |>
+    left_join(fuel_upstream, by = "fuel") |>
+    mutate(
+      upstream = if_else(
+        fuel == "Electric",
+        kwh_km * grid_g_per_kwh,
+        fuel_g_km / 1000 * mj_per_kg * wtt_g_per_mj
+      ),
+      co2 = co2 + upstream
+    ) |>
+    inner_join(vehicle_modes, by = "vehicle", relationship = "many-to-many") |>
+    left_join(occupancy, by = "mode") |>
+    mutate(across(c(co2, ch4, n2o, nox, pm), \(x) x / occupancy)) |>
+    select(mode, fuel, co2, ch4, n2o, nox, pm)
 }
 
 ## co2_equivalent() ------------------------------------------------------------
 
-# CO2eq from the three greenhouse gases, weighting CH4 and N2O by their 100-year
-# global warming potential. Still to decide: which IPCC report's values.
+# 100-year GWPs from IPCC AR6 WG1, chapter 7, Table 7.15 (Forster et al.,
+# 2021, doi:10.1017/9781009157896.009). Tailpipe CH4 comes from fossil fuel,
+# so it uses CH4-fossil (29.8) rather than CH4-non fossil (27.0).
+# https://www.ipcc.ch/report/ar6/wg1/chapter/chapter-7/
+gwp <- c(ch4 = 29.8, n2o = 273)
+
 co2_equivalent <- function(co2, ch4, n2o) {
-  stop("co2_equivalent() is not written yet")
+  co2 + gwp[["ch4"]] * ch4 + gwp[["n2o"]] * n2o
 }
 
 ## combine_factors() -----------------------------------------------------------
 
-# Stacks the two tables above into the one described at the top, fills in
-# co2eq, and adds walk and bike with zero for every gas.
+# Sheet rows plus COPERT rows (which replace the sheet's for the same modes),
+# with co2eq computed for every row.
 combine_factors <- function(mode_factors, vehicle_factors) {
-  stop("combine_factors() is not written yet")
+  factors <- mode_factors |>
+    filter(!mode %in% vehicle_factors$mode) |>
+    select(-occupancy) |>
+    mutate(fuel = NA_character_) |>
+    bind_rows(vehicle_factors) |>
+    mutate(co2eq = co2_equivalent(co2, ch4, n2o)) |>
+    select(mode, fuel, all_of(gases))
+
+  missing <- factors |>
+    filter(if_any(all_of(gases), is.na)) |>
+    pull(mode) |>
+    unique()
+  if (length(missing) > 0) {
+    stop("No factors for: ", toString(missing))
+  }
+
+  dupes <- factors |>
+    count(mode, fuel) |>
+    filter(n > 1)
+  if (nrow(dupes) > 0) {
+    stop("Duplicate rows for: ", toString(paste(dupes$mode, dupes$fuel)))
+  }
+
+  factors
 }
