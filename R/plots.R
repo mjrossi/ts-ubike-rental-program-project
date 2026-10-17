@@ -2,6 +2,10 @@
 # Each function takes survey data (or a subset) and returns a ggplot:
 #   plot_modes(students) + labs(title = "Students' commute modes")
 # Needs survey_codebook.R and chart_style.R sourced first.
+#
+# A column passed in by name, like plot_share(survey, floor_group), is written
+# {{ column }} inside the function. That passes the bare name on to dplyr and
+# ggplot, as if it had been typed there.
 
 library(dplyr)
 library(forcats)

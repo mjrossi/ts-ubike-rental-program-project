@@ -1,7 +1,3 @@
-library(dplyr)
-
-source(test_path("..", "..", "R", "emission_factors.R"))
-
 copert_small <- test_path("fixtures", "copert_small.csv")
 
 # A one-row COPERT file

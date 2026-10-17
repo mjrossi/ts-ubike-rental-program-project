@@ -1,37 +1,26 @@
 # Shift models -----------------------------------------------------------------
-# The parts of each shift model, as tables, and the models built from them.
-# R/decision_tree.R runs them. Edit this file to change a model:
-#   survey |> score_shift(model_v1)
+# Each model's parts as tables, and the models built from them. Edit this file
+# to change a model; R/decision_tree.R runs them.
 #
-# The parts, each of which can be swapped on its own:
-#   - Probabilities: tier_probabilities and willingness_weights make
-#     shift_probabilities, the matrix with p_shift for each tier and Q23
-#     answer. Set a cell by hand to break from the product.
-#   - Trees: gates, branches and leaves.
-#       New question: a row in gates. Its column must be in the survey or made
-#       by add_groups() in R/survey_codebook.R (add it there if it needs a
-#       threshold or combines questions).
-#       New answer route: a row in branches. Several values can lead to the
-#       same node ("Yes or a bit" is two rows).
-#       New outcome: a row in leaves, with a tier from tier_levels.
-#   - Adjustment: trip_chain_v1, tree_v1's Gate 3. One row per value.
-#   - Modifiers: one row each in modifier_library, picked by name for each
-#     model. New modifier: a row with steps -1 or +1.
-#   - Models: shift_model() puts the parts together and checks them.
+# In the trees:
+#   New question: a row in gates. Its column must be in the survey or made by
+#     add_groups() (R/survey_codebook.R), which is where thresholds go.
+#   New answer route: a row in branches. Several values can lead to the same
+#     node ("Yes or a bit" is two rows).
+#   New outcome: a row in leaves, with a tier from tier_levels.
 #
-# To try a change without editing this file, copy a model and swap a part
-# (score_shift() checks the parts again):
+# To try a change without editing this file, copy a model and swap a part:
 #   trial <- model_v1
 #   trial$modifiers <- pick_modifiers(modifier_library, "escort stop")
 #   trial$matrix["Moderate", "Unsure"] <- 0.15
 #   compare_models(survey, list(v1 = model_v1, trial = trial))
 #
-# reason holds the justification the brief asks for (against the Hierarchy of
-# Cycling Needs). TODO: fill them in.
+# TODO: each reason cell should justify its row against the Hierarchy of
+# Cycling Needs.
 #
 # The tables stay one row per line, aligned by air, so lintr skips this file's
-# line lengths and comma spacing.
-# nolint start: line_length_linter, commas_linter.
+# line lengths.
+# nolint start: line_length_linter.
 
 library(dplyr)
 
@@ -55,7 +44,7 @@ willingness_weights <- c(
 )
 
 # p_shift for each tier (rows) and Q23 answer (columns): the product of the
-# two above. To set a cell by hand, after this line:
+# two above. To set a cell by hand, add a line after this one:
 #   shift_probabilities["Very high", "Unsure"] <- 0.35
 shift_probabilities <- shift_matrix(tier_probabilities, willingness_weights)
 

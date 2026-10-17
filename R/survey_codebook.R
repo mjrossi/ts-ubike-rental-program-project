@@ -123,7 +123,7 @@ survey_key <- list(
 ## read_survey() ---------------------------------------------------------------
 
 # The workbook with the survey and the "Emission factors" sheet
-survey_path <- "./data/TS_Project_SurveyUBike_final (local).xlsx"
+survey_path <- "data/ubike_survey.xlsx"
 
 # Reads, labels and groups the survey. Every script starts with this.
 read_survey <- function(path = survey_path) {
@@ -139,12 +139,15 @@ label_survey <- function(data) {
   # Otherwise the names would land on the wrong columns
   headers <- vapply(
     survey_key,
-    \(key) key$header,
+    function(key) key$header,
     character(1),
     USE.NAMES = FALSE
   )
   if (!identical(names(data), headers)) {
-    stop("The Excel headers differ from survey_key. Update survey_key.")
+    stop(
+      "The Excel headers differ from survey_key. Update survey_key.",
+      call. = FALSE
+    )
   }
 
   names(data) <- names(survey_key)
@@ -167,9 +170,10 @@ label_survey <- function(data) {
 ## add_groups() ----------------------------------------------------------------
 
 # Grouped columns for the charts, and the answers the decision tree's gates
-# and modifiers read (R/trees.R). Thresholds and combinations of questions are
-# settled here, so the trees only list values. A blank answer stays blank
-# (except Q20's), so the decision tree stops on it rather than guess.
+# and modifiers read (R/shift_models.R). Thresholds and combinations of
+# questions are settled here, so the trees only list values. A blank answer
+# stays blank (except Q20's), so the decision tree stops on it rather than
+# guess.
 add_groups <- function(data) {
   data |>
     left_join(mode_profiles(data), by = "id") |>
@@ -284,7 +288,7 @@ mode_profiles <- function(data) {
           car ~ "Car",
           transit ~ "Transit",
           active ~ "Walk or bike only",
-          TRUE ~ "Other"
+          .default = "Other"
         ),
         levels = c(
           "Car",

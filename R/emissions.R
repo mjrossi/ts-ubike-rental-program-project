@@ -19,12 +19,15 @@ library(forcats)
 add_main_mode <- function(data, factors) {
   # Cars have a row per fuel, so take the highest
   mode_co2eq <- factors |>
-    summarise(co2eq = max(co2eq), .by = mode)
+    group_by(mode) |>
+    summarise(co2eq = max(co2eq))
 
   main_modes <- split_modes(data) |>
     mutate(mode = as.character(mode)) |>
     left_join(mode_co2eq, by = "mode") |>
-    slice_max(co2eq, n = 1, with_ties = FALSE, by = id) |>
+    group_by(id) |>
+    slice_max(co2eq, n = 1, with_ties = FALSE) |>
+    ungroup() |>
     select(id, main_mode = mode)
 
   data |>
@@ -45,11 +48,14 @@ add_current_emissions <- function(data, factors, trips_per_day = 1) {
     count(fuel = as.character(fuel_type)) |>
     mutate(share = n / sum(n))
 
-  # One row per mode, for people without a fuel
+  # One row per mode, for people without a fuel. Modes without fuels (bus,
+  # walk, ...) keep their only row. A fuel no car owner uses (Electric) gets a
+  # weight of 0.
   mode_average <- factors |>
     left_join(fuel_shares, by = "fuel") |>
     mutate(share = if_else(is.na(fuel), 1, coalesce(share, 0))) |>
-    summarise(across(all_of(gases), \(x) weighted.mean(x, share)), .by = mode)
+    group_by(mode) |>
+    summarise(across(all_of(gases), function(x) weighted.mean(x, share)))
 
   by_fuel <- data |>
     select(id, mode = main_mode, fuel = fuel_type) |>
@@ -57,20 +63,30 @@ add_current_emissions <- function(data, factors, trips_per_day = 1) {
     inner_join(filter(factors, !is.na(fuel)), by = c("mode", "fuel")) |>
     select(id, all_of(gases))
 
-  # Mode average first, then the fuel factor where there is one
+  # Mode average first, then rows_update() swaps in the fuel factor where
+  # there is one
   data <- data |>
     left_join(mode_average, by = c(main_mode = "mode")) |>
     rows_update(by_fuel, by = "id")
 
-  missing <- unique(data$main_mode[is.na(data$co2eq)])
-  if (length(missing) > 0) {
-    stop("No emission factor for main_mode: ", toString(missing))
+  no_factor <- unique(data$main_mode[is.na(data$co2eq)])
+  if (length(no_factor) > 0) {
+    stop(
+      "No emission factor for main_mode: ",
+      toString(no_factor),
+      call. = FALSE
+    )
   }
 
   data |>
     mutate(
       commute_km = distance_km * trips_per_day,
-      across(all_of(gases), \(x) x * commute_km, .names = "current_{.col}")
+      current_co2 = co2 * commute_km,
+      current_ch4 = ch4 * commute_km,
+      current_n2o = n2o * commute_km,
+      current_co2eq = co2eq * commute_km,
+      current_nox = nox * commute_km,
+      current_pm = pm * commute_km
     ) |>
     select(-all_of(gases))
 }
@@ -80,16 +96,17 @@ add_current_emissions <- function(data, factors, trips_per_day = 1) {
 # Adds km_shifted and saved_<gas>: commute_km and current_<gas> times p_shift.
 add_savings <- function(data) {
   if (!"p_shift" %in% names(data)) {
-    stop("p_shift is missing: run the decision tree first")
+    stop("p_shift is missing: run the decision tree first", call. = FALSE)
   }
   data |>
     mutate(
       km_shifted = commute_km * p_shift,
-      across(
-        all_of(paste0("current_", gases)),
-        \(x) x * p_shift,
-        .names = "{sub('current_', 'saved_', .col)}"
-      )
+      saved_co2 = current_co2 * p_shift,
+      saved_ch4 = current_ch4 * p_shift,
+      saved_n2o = current_n2o * p_shift,
+      saved_co2eq = current_co2eq * p_shift,
+      saved_nox = current_nox * p_shift,
+      saved_pm = current_pm * p_shift
     )
 }
 

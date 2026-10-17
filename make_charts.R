@@ -5,6 +5,7 @@
 
 library(dplyr)
 library(forcats)
+library(ggplot2)
 
 source("R/survey_codebook.R") # read_survey(), column names and answer labels
 source("R/chart_style.R") # colours and theme for the charts

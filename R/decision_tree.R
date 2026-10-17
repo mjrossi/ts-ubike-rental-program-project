@@ -1,30 +1,21 @@
 # Decision tree ----------------------------------------------------------------
-# Task 2 (brief, section 4 and Figure 1): each person's probability of shifting
-# to cycling (p_shift). This file only holds the machinery. The parts to edit
-# are in R/trees.R.
+# Runs a shift model to give each person's p_shift (brief, section 4 and
+# Figure 1). The models themselves are in R/shift_models.R.
 #
-# A shift model has four parts, and each can be swapped on its own:
-#   tree        start, gates, branches and leaves: each person's leaf and tier,
-#               from their circumstances (not Q23)
-#   adjustment  optional. One column (tree_v1's Gate 3), with steps and a cap
-#               for each of its values
-#   modifiers   optional. +-1-tier nudges, net at most max_modifier_steps
-#   matrix      p_shift for each tier (rows) and Q23 answer (columns)
-# shift_model() checks and bundles them, and score_shift() runs one:
 #   survey |> score_shift(model_v1)
-# which is add_tier() |> adjust_tier() |> add_shift_probability().
-# compare_models() runs several side by side.
 #
-# The tables, one row per:
-#   gates      question   node, column, label, reason
-#   branches   answer     node, value, to
-#   leaves     outcome    leaf, tier, reason
-#   adjustment value      column, plus effects: value, steps, max_tier, reason
-#   modifiers  modifier   modifier, column, value, steps, reason
-# A person at a gate moves along the branch whose value matches their answer
-# in the gate's column, until they reach a leaf. The columns the gates,
-# adjustment and modifiers read come from add_groups() (R/survey_codebook.R).
-# A blank answer in any of them stops the model and names the ids.
+# is add_tier() |> adjust_tier() |> add_shift_probability(). A model's parts,
+# and the columns of each table:
+#   tree        start, plus tables
+#                 gates     node, column, label, reason
+#                 branches  node, value, to
+#                 leaves    leaf, tier, reason
+#   adjustment  optional. column, plus effects: value, steps, max_tier, reason
+#   modifiers   optional. modifier, column, value, steps, reason
+#   matrix      p_shift for each tier (rows) and Q23 answer (columns)
+# A person at a gate follows the branch whose value matches their answer in
+# the gate's column, until they reach a leaf. Those columns come from
+# add_groups() (R/survey_codebook.R).
 
 library(dplyr)
 
@@ -80,7 +71,8 @@ pick_modifiers <- function(modifiers, names) {
       "No modifier called ",
       toString(unknown),
       ". There are: ",
-      toString(modifiers$modifier)
+      toString(modifiers$modifier),
+      call. = FALSE
     )
   }
   modifiers[match(names, modifiers$modifier), ]
@@ -100,21 +92,24 @@ shift_matrix <- function(tier, willingness) {
 # Q23 answer. Warns if a probability falls as the tier or willingness rises.
 check_matrix <- function(matrix) {
   if (!is.matrix(matrix) || !is.numeric(matrix)) {
-    stop("The probability matrix must be a numeric matrix")
+    stop("The probability matrix must be a numeric matrix", call. = FALSE)
   }
   stop_unless_names(matrix[, 1], tier_levels, "matrix rows")
   stop_unless_names(matrix[1, ], willingness_levels, "matrix columns")
   if (anyNA(matrix) || any(matrix < 0 | matrix > 1)) {
-    stop("The probability matrix must be between 0 and 1, with no blanks")
+    stop(
+      "The probability matrix must be between 0 and 1, with no blanks",
+      call. = FALSE
+    )
   }
 
-  ordered <- matrix[tier_levels, willingness_levels]
+  in_order <- matrix[tier_levels, willingness_levels]
   falls <- c(
-    if (any(diff(ordered) < 0)) "as the tier rises",
-    if (any(diff(t(ordered)) < 0)) "as willingness rises"
+    if (any(diff(in_order) < 0)) "as the tier rises",
+    if (any(diff(t(in_order)) < 0)) "as willingness rises"
   )
   if (length(falls) > 0) {
-    warning("p_shift falls ", paste(falls, collapse = " and "))
+    warning("p_shift falls ", paste(falls, collapse = " and "), call. = FALSE)
   }
   invisible(matrix)
 }
@@ -129,7 +124,8 @@ stop_unless_names <- function(x, levels, what) {
       toString(levels),
       " (got ",
       toString(names(x)),
-      ")"
+      ")",
+      call. = FALSE
     )
   }
 }
@@ -151,7 +147,10 @@ check_tree <- function(tree) {
   stop_if_problems(
     "The tree",
     list(
-      "Not a gate: start = " = setdiff(tree$start %||% "(none)", gates),
+      "Not a gate: start = " = setdiff(
+        if (is.null(tree$start)) "(none)" else tree$start,
+        gates
+      ),
       "More than one start: " = if (length(tree$start) > 1) tree$start,
       "Repeated gates: " = gates[duplicated(gates)],
       "Repeated leaves: " = leaves[duplicated(leaves)],
@@ -213,21 +212,21 @@ check_adjustment <- function(adjustment) {
     return(invisible(adjustment))
   }
   if (!is.character(adjustment$column) || length(adjustment$column) != 1) {
-    stop("The adjustment needs one column name")
+    stop("The adjustment needs one column name", call. = FALSE)
   }
-  effects <- adjustment$effects
+  effect_rows <- adjustment$effects
   stop_if_missing(
-    effects,
+    effect_rows,
     c("value", "steps", "max_tier", "reason"),
     "adjustment effects"
   )
   stop_if_problems(
     "The adjustment",
     list(
-      "Repeated values: " = effects$value[duplicated(effects$value)],
-      "Steps that aren't whole numbers: " = bad_steps(effects$steps),
+      "Repeated values: " = effect_rows$value[duplicated(effect_rows$value)],
+      "Steps that aren't whole numbers: " = bad_steps(effect_rows$steps),
       "Adjustment max_tier not in tier_levels: " = setdiff(
-        na.omit(effects$max_tier),
+        na.omit(effect_rows$max_tier),
         tier_levels
       )
     )
@@ -275,7 +274,8 @@ check_max_modifier_steps <- function(steps) {
     stop(
       "max_modifier_steps must be one whole number, 0 or more (got ",
       toString(steps),
-      ")"
+      ")",
+      call. = FALSE
     )
   }
 }
@@ -284,9 +284,9 @@ check_max_modifier_steps <- function(steps) {
 
 # Stops unless the table has every column in `columns`
 stop_if_missing <- function(table, columns, what) {
-  missing <- setdiff(columns, names(table))
-  if (length(missing) > 0) {
-    stop("The ", what, " table has no column ", toString(missing))
+  absent <- setdiff(columns, names(table))
+  if (length(absent) > 0) {
+    stop("The ", what, " table has no column ", toString(absent), call. = FALSE)
   }
 }
 
@@ -299,9 +299,10 @@ stop_if_problems <- function(what, problems) {
       " isn't valid:\n",
       paste0(
         names(problems),
-        vapply(problems, \(x) toString(unique(x)), character(1)),
+        sapply(problems, function(x) toString(unique(x))),
         collapse = "\n"
-      )
+      ),
+      call. = FALSE
     )
   }
 }
@@ -322,7 +323,8 @@ stop_if_blank <- function(data, column, what) {
       ", read by ",
       what,
       " ",
-      ids_where(data, blank)
+      ids_where(data, blank),
+      call. = FALSE
     )
   }
 }
@@ -355,7 +357,8 @@ walk_tree <- function(data, tree) {
           " = ",
           toString(unique(values[is.na(to)])),
           " ",
-          ids_where(data[here, ], is.na(to))
+          ids_where(data[here, ], is.na(to)),
+          call. = FALSE
         )
       }
       at[here] <- to
@@ -369,8 +372,8 @@ walk_tree <- function(data, tree) {
 
 # Adds path, leaf, base_tier, modifiers, tier and p_shift from a shift_model().
 # Warns about modifiers that apply to nobody (a typo in value, say). Each step
-# checks its own part, so the model isn't checked here as well (which would
-# give check_matrix()'s warning twice).
+# checks its own part; checking the whole model here too would repeat
+# check_matrix()'s warning.
 score_shift <- function(data, model) {
   scored <- data |>
     add_tier(model$tree) |>
@@ -381,13 +384,14 @@ score_shift <- function(data, model) {
     ) |>
     add_shift_probability(model$matrix)
 
-  modifiers <- model$modifiers
-  if (!is.null(modifiers)) {
-    applies <- modifier_applies(data, modifiers)
-    unused <- modifiers$modifier[colSums(applies) == 0]
-    if (length(unused) > 0) {
-      warning("These modifiers apply to nobody: ", toString(unused))
-    }
+  applied <- unlist(strsplit(scored$modifiers, ", "))
+  unused <- setdiff(model$modifiers$modifier, applied)
+  if (length(unused) > 0) {
+    warning(
+      "These modifiers apply to nobody: ",
+      toString(unused),
+      call. = FALSE
+    )
   }
   scored
 }
@@ -396,16 +400,22 @@ score_shift <- function(data, model) {
 # p_shift, and the people in each tier
 compare_models <- function(data, models) {
   if (is.null(names(models)) || any(names(models) == "")) {
-    stop("Name every model, e.g. list(v1 = model_v1, v2 = model_v2)")
-  }
-  rows <- lapply(models, \(model) {
-    scored <- score_shift(data, model)
-    tiers <- as.list(table(factor(scored$tier, levels = tier_levels)))
-    tibble(
-      mean_p_shift = mean(scored$p_shift),
-      expected_shifters = sum(scored$p_shift),
-      !!!tiers
+    stop(
+      "Name every model, e.g. list(v1 = model_v1, v2 = model_v2)",
+      call. = FALSE
     )
+  }
+  rows <- lapply(models, function(model) {
+    score_shift(data, model) |>
+      summarise(
+        mean_p_shift = mean(p_shift),
+        expected_shifters = sum(p_shift),
+        `Very low` = sum(tier == "Very low"),
+        Low = sum(tier == "Low"),
+        Moderate = sum(tier == "Moderate"),
+        High = sum(tier == "High"),
+        `Very high` = sum(tier == "Very high")
+      )
   })
   bind_rows(rows, .id = "model")
 }
@@ -415,18 +425,12 @@ compare_models <- function(data, models) {
 # Adds path, leaf and base_tier (a factor with tier_levels).
 add_tier <- function(data, tree) {
   route <- walk_tree(data, tree)
+  leaf_tier <- tree$leaves$tier[match(route$leaf, tree$leaves$leaf)]
 
-  data |>
-    # .env$, so a column with the same name (from an earlier run) isn't read
-    # in place of the local
-    mutate(
-      path = .env$route$path,
-      leaf = .env$route$leaf,
-      base_tier = factor(
-        .env$tree$leaves$tier[match(.env$route$leaf, .env$tree$leaves$leaf)],
-        levels = tier_levels
-      )
-    )
+  data$path <- route$path
+  data$leaf <- route$leaf
+  data$base_tier <- factor(leaf_tier, levels = tier_levels)
+  data
 }
 
 ## adjust_tier() ---------------------------------------------------------------
@@ -443,7 +447,7 @@ adjust_tier <- function(
   max_modifier_steps = 1
 ) {
   if (!"base_tier" %in% names(data)) {
-    stop("base_tier is missing: run add_tier() first")
+    stop("base_tier is missing: run add_tier() first", call. = FALSE)
   }
   check_max_modifier_steps(max_modifier_steps)
 
@@ -455,7 +459,8 @@ adjust_tier <- function(
       "base_tier not in tier_levels: ",
       toString(unique(tiers[is.na(position)])),
       " ",
-      ids_where(data, is.na(position))
+      ids_where(data, is.na(position)),
+      call. = FALSE
     )
   }
   top <- length(tier_levels)
@@ -473,11 +478,9 @@ adjust_tier <- function(
   position <- within_tiers(position + net)
   position <- pmin(position, cap)
 
-  data |>
-    mutate(
-      modifiers = .env$matched$names,
-      tier = factor(tier_levels[.env$position], levels = tier_levels)
-    )
+  data$modifiers <- matched$names
+  data$tier <- factor(tier_levels[position], levels = tier_levels)
+  data
 }
 
 # Each person's row of adjustment$effects. Stops on a blank answer or a value
@@ -495,7 +498,8 @@ match_adjustment <- function(data, adjustment) {
       "No adjustment for ",
       column,
       " = ",
-      toString(unique(values[is.na(effect$value)]))
+      toString(unique(values[is.na(effect$value)])),
+      call. = FALSE
     )
   }
   effect
@@ -506,32 +510,27 @@ match_adjustment <- function(data, adjustment) {
 # answer in column equals value. Stops on a blank answer.
 match_modifiers <- function(data, modifiers) {
   check_modifiers(modifiers)
-  if (is.null(modifiers) || nrow(modifiers) == 0) {
-    return(list(names = rep("", nrow(data)), steps = rep(0, nrow(data))))
+  modifier_names <- rep("", nrow(data))
+  steps <- rep(0, nrow(data))
+  if (is.null(modifiers)) {
+    return(list(names = modifier_names, steps = steps))
   }
   stop_if_missing(data, modifiers$column, "data")
+
   for (i in seq_len(nrow(modifiers))) {
-    stop_if_blank(data, modifiers$column[i], modifiers$modifier[i])
+    modifier <- modifiers$modifier[i]
+    column <- modifiers$column[i]
+    stop_if_blank(data, column, modifier)
+
+    applies <- data[[column]] == modifiers$value[i]
+    steps[applies] <- steps[applies] + modifiers$steps[i]
+    modifier_names[applies] <- if_else(
+      modifier_names[applies] == "",
+      modifier,
+      paste(modifier_names[applies], modifier, sep = ", ")
+    )
   }
-
-  applies <- modifier_applies(data, modifiers)
-  list(
-    names = apply(applies, 1, \(row) toString(modifiers$modifier[row])),
-    steps = drop(applies %*% modifiers$steps)
-  )
-}
-
-# Whether each modifier applies to each person: one row per person, one
-# column per modifier
-modifier_applies <- function(data, modifiers) {
-  applies <- vapply(
-    seq_len(nrow(modifiers)),
-    \(i) data[[modifiers$column[i]]] %in% modifiers$value[i],
-    logical(nrow(data))
-  )
-  # vapply() gives a vector for one person
-  dim(applies) <- c(nrow(data), nrow(modifiers))
-  applies
+  list(names = modifier_names, steps = steps)
 }
 
 ## add_shift_probability() -----------------------------------------------------
@@ -539,13 +538,15 @@ modifier_applies <- function(data, modifiers) {
 # Adds p_shift: the matrix cell for the person's tier and Q23 answer.
 add_shift_probability <- function(data, matrix) {
   if (!"tier" %in% names(data)) {
-    stop("tier is missing: run adjust_tier() first")
+    stop("tier is missing: run adjust_tier() first", call. = FALSE)
   }
   # Without it, cbind() below drops the column and the matrix is read by
   # position
   stop_if_missing(data, "willingness", "data")
   check_matrix(matrix)
 
+  # One cell per person: matrix[cbind(rows, columns)] reads the cell at each
+  # (row, column) pair
   tier <- as.character(data$tier)
   willingness <- as.character(data$willingness)
   cell <- cbind(
@@ -555,22 +556,23 @@ add_shift_probability <- function(data, matrix) {
   p_shift <- matrix[cell]
 
   if (anyNA(p_shift)) {
-    missing <- unique(paste(tier, willingness, sep = " / ")[is.na(p_shift)])
+    no_cell <- unique(paste(tier, willingness, sep = " / ")[is.na(p_shift)])
     stop(
       "No probability for: ",
-      toString(missing),
+      toString(no_cell),
       " ",
-      ids_where(data, is.na(p_shift))
+      ids_where(data, is.na(p_shift)),
+      call. = FALSE
     )
   }
-  mutate(data, p_shift = .env$p_shift)
+  data$p_shift <- p_shift
+  data
 }
 
 ## tree_table() ----------------------------------------------------------------
 
 # One row per gate and leaf, with its label (the tier, for a leaf) and
-# reason, and the number of people passing through it if paths from
-# add_tier() are given. For the slide that justifies the tree:
+# reason, plus the number of people through it when given add_tier()'s paths:
 #   tree_table(model$tree, survey$path)
 tree_table <- function(tree, paths = NULL) {
   check_tree(tree)

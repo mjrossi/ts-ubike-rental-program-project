@@ -8,7 +8,7 @@ library(dplyr)
 
 source("R/survey_codebook.R") # read_survey(), column names and answer labels
 source("R/decision_tree.R") # shift_model(), score_shift(), compare_models()
-source("R/trees.R") # model_v1, model_v2, model_brief and their parts
+source("R/shift_models.R") # model_v1, model_v2, model_brief and their parts
 source("R/emission_factors.R") # the g/p.km table for every mode
 source("R/emissions.R") # add_main_mode(), add_current_emissions(), ...
 
@@ -18,8 +18,7 @@ survey <- read_survey()
 
 # Decision tree ----------------------------------------------------------------
 
-# Mean p_shift and people per tier for each model. To try a change, see the
-# top of R/trees.R.
+# Mean p_shift and people per tier for each model
 compare_models(
   survey,
   list(v1 = model_v1, v2 = model_v2, brief = model_brief)
@@ -37,7 +36,7 @@ count(survey, base_tier, tier)
 
 mode_factors <- read_mode_factors(survey_path)
 # TODO: placeholder numbers until the COPERT v25 export exists
-copert_path <- "./data/copert_placeholder.csv"
+copert_path <- "data/copert_placeholder.csv"
 factors <- combine_factors(
   mode_factors,
   copert_factors(copert_path, select(mode_factors, mode, occupancy))
@@ -45,10 +44,8 @@ factors <- combine_factors(
 
 # Emissions --------------------------------------------------------------------
 
-# TODO: one-way or round trip? Q17 asks for "the travel distance of your
-# commuting trip" and the brief (section 5) works in grams per trip, so we
-# count one trip as one-way for now. If the brief means a daily commute, use
-# trips_per_day = 2.
+# TODO: one-way or round trip? One-way for now (see docs/methods.md).
+# If the brief means a daily commute, use trips_per_day = 2.
 survey <- survey |>
   add_main_mode(factors) |>
   add_current_emissions(factors, trips_per_day = 1) |>

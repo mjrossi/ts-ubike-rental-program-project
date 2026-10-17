@@ -9,8 +9,7 @@ Brief references are to `docs/project_brief.pdf`.
 
 ```r
 survey <- read_survey() |>           # R/survey_codebook.R
-  score_shift(model_v1) |>           # p_shift. R/decision_tree.R, model
-                                     # from R/trees.R
+  score_shift(model_v1) |>           # R/decision_tree.R, R/shift_models.R
   add_main_mode(factors) |>          # R/emissions.R
   add_current_emissions(factors) |>
   add_savings()
@@ -18,7 +17,9 @@ survey <- read_survey() |>           # R/survey_codebook.R
 total_savings(survey, role)
 ```
 
-`factors` is the emission factor table built in `R/emission_factors.R`.
+`factors` is the emission factor table from `R/emission_factors.R`. The
+sections below follow the order the numbers are needed in: factors (1),
+current emissions (2), the probability of shifting (3), then savings (4).
 
 ## 1. Emission factors
 
@@ -130,8 +131,8 @@ $$
 The decision tree places each person in a tier from their circumstances,
 leaving out their stated willingness (brief, section 4). $p_{shift}$ is then
 the cell of the probability matrix $M$ (`shift_probabilities` in
-`R/trees.R`) for their tier and Q23 answer. $M$ starts as the product of the
-two tables below, and any cell can be set by hand.
+`R/shift_models.R`) for their tier and Q23 answer. $M$ starts as the product
+of the two tables below, and any cell can be set by hand.
 
 | Tier | Very low | Low | Moderate | High | Very high |
 |---|---|---|---|---|---|
@@ -148,11 +149,11 @@ probabilities, section 6, criterion 2).
 
 ### The model
 
-A shift model has four parts, each in `R/trees.R` and each swappable on its
-own: a tree, an optional adjustment (`tree_v1`'s Gate 3), modifiers picked by
-name from `modifier_library`, and the matrix. `shift_model()` checks and
-bundles them, `score_shift()` runs one, and `compare_models()` lists the mean
-$p_{shift}$ and the people per tier for several side by side.
+A shift model has four parts, each in `R/shift_models.R` and each swappable
+on its own: a tree, an optional adjustment (`tree_v1`'s Gate 3), modifiers
+picked by name from `modifier_library`, and the matrix. `shift_model()`
+checks and bundles them, `score_shift()` runs one, and `compare_models()`
+lists the mean $p_{shift}$ and the people per tier for several side by side.
 
 | Model | Tree | Adjustment | Modifiers |
 |---|---|---|---|
@@ -162,11 +163,11 @@ $p_{shift}$ and the people per tier for several side by side.
 
 ### The trees
 
-The trees are tables in `R/trees.R`, and `R/decision_tree.R` walks them. Each
-tree lists its gates (the question and the column it reads), its branches (one
-row per answer, leading to a gate or a leaf) and its leaves (a tier). A
-`reason` column next to each gate, leaf, Gate 3 value and modifier holds the
-justification against the Hierarchy of Cycling Needs.
+The trees are tables in `R/shift_models.R`, and `R/decision_tree.R` walks
+them. Each tree lists its gates (the question and the column it reads), its
+branches (one row per answer, leading to a gate or a leaf) and its leaves (a
+tier). A `reason` column next to each gate, leaf, Gate 3 value and modifier
+holds the justification against the Hierarchy of Cycling Needs.
 
 | Tree | Gates | After the tree, in its model |
 |---|---|---|
@@ -213,8 +214,8 @@ ids rather than guess. Only Q20 has blanks today.
   confidence or parking.
 
 `tree_table(tree, survey$path)` lists each gate and leaf with its label,
-reason and number of people, ready for the slides. Each person's `path`
-column shows the route that put them in their tier.
+reason and number of people, for the slides. Each person's `path` column
+shows the route that put them in their tier, like `gate1 > gate2a > A3`.
 
 ## 4. Savings
 
@@ -242,8 +243,8 @@ every mode) but save no emissions, since their factors are 0.
 - **Decision tree.** `model_v1` or `model_v2` (`main.R` uses `model_v1`). The
   brief's ±1-tier modifiers are children, stops, travel time or campus:
   `model_v2`'s escort stop fits that, while `model_v1` treats children and
-  stops as Gate 3 caps and uses bike parking as a modifier. The
-  `reason` cells in `R/trees.R` are TODOs: each gate, leaf and modifier needs a
+  stops as Gate 3 caps and uses bike parking as a modifier. The `reason`
+  cells in `R/shift_models.R` are TODOs: each gate, leaf and modifier needs a
   reason based on the Hierarchy of Cycling Needs. Decide whether `tree_v1`'s
   Gate 3 caps stay as caps or become one-tier steps (see
   [Adjusting the tier](#adjusting-the-tier)).
