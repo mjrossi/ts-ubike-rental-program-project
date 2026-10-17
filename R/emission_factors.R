@@ -42,7 +42,11 @@ read_mode_factors <- function(path) {
 
   unknown <- setdiff(sheet$Mode, names(sheet_modes))
   if (length(unknown) > 0) {
-    stop("Unknown rows in the Emission factors sheet: ", toString(unknown))
+    stop(
+      "Unknown rows in the Emission factors sheet: ",
+      toString(unknown),
+      call. = FALSE
+    )
   }
 
   sheet |>
@@ -86,9 +90,8 @@ vehicle_modes <- tribble(
 # Car and motorbike rows from a COPERT export: one row per vehicle and fuel,
 # with fuel_g_km (kwh_km for Electric), co2, ch4, n2o, nox and pm in g/vkm.
 # Adds upstream emissions, then divides by each mode's occupancy to get g/p.km.
-# Upstream is only given as CO2eq, so it goes into co2, as the workbook does
-# for electric rail and metro: co2eq stays right, but co2 carries a little
-# upstream CH4 and N2O.
+# Upstream is only known as CO2eq, so it's added to co2, as the workbook does
+# for electric rail and metro.
 copert_factors <- function(path, occupancy) {
   copert <- read_csv(path, show_col_types = FALSE)
 
@@ -97,12 +100,16 @@ copert_factors <- function(path, occupancy) {
     setdiff(copert$fuel, c(fuel_upstream$fuel, "Electric"))
   )
   if (length(unknown) > 0) {
-    stop("Unknown vehicles or fuels in the COPERT file: ", toString(unknown))
+    stop(
+      "Unknown vehicles or fuels in the COPERT file: ",
+      toString(unknown),
+      call. = FALSE
+    )
   }
 
-  missing <- setdiff(vehicle_modes$vehicle, copert$vehicle)
-  if (length(missing) > 0) {
-    stop("No rows in the COPERT file for: ", toString(missing))
+  no_rows <- setdiff(vehicle_modes$vehicle, copert$vehicle)
+  if (length(no_rows) > 0) {
+    stop("No rows in the COPERT file for: ", toString(no_rows), call. = FALSE)
   }
 
   copert |>
@@ -117,7 +124,7 @@ copert_factors <- function(path, occupancy) {
     ) |>
     inner_join(vehicle_modes, by = "vehicle", relationship = "many-to-many") |>
     left_join(occupancy, by = "mode") |>
-    mutate(across(c(co2, ch4, n2o, nox, pm), \(x) x / occupancy)) |>
+    mutate(across(c(co2, ch4, n2o, nox, pm), function(x) x / occupancy)) |>
     select(mode, fuel, co2, ch4, n2o, nox, pm)
 }
 
@@ -146,19 +153,23 @@ combine_factors <- function(mode_factors, vehicle_factors) {
     mutate(co2eq = co2_equivalent(co2, ch4, n2o)) |>
     select(mode, fuel, all_of(gases))
 
-  missing <- factors |>
+  no_factors <- factors |>
     filter(if_any(all_of(gases), is.na)) |>
     pull(mode) |>
     unique()
-  if (length(missing) > 0) {
-    stop("No factors for: ", toString(missing))
+  if (length(no_factors) > 0) {
+    stop("No factors for: ", toString(no_factors), call. = FALSE)
   }
 
   dupes <- factors |>
     count(mode, fuel) |>
     filter(n > 1)
   if (nrow(dupes) > 0) {
-    stop("Duplicate rows for: ", toString(paste(dupes$mode, dupes$fuel)))
+    stop(
+      "Duplicate rows for: ",
+      toString(paste(dupes$mode, dupes$fuel)),
+      call. = FALSE
+    )
   }
 
   factors

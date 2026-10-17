@@ -4,6 +4,7 @@
 # the columns and swaps the codes for labels.
 
 library(dplyr)
+library(forcats)
 library(readxl)
 library(tidyr)
 
@@ -122,7 +123,7 @@ survey_key <- list(
 ## read_survey() ---------------------------------------------------------------
 
 # The workbook with the survey and the "Emission factors" sheet
-survey_path <- "./data/TS_Project_SurveyUBike_final (local).xlsx"
+survey_path <- "data/ubike_survey.xlsx"
 
 # Reads, labels and groups the survey. Every script starts with this.
 read_survey <- function(path = survey_path) {
@@ -138,12 +139,15 @@ label_survey <- function(data) {
   # Otherwise the names would land on the wrong columns
   headers <- vapply(
     survey_key,
-    \(key) key$header,
+    function(key) key$header,
     character(1),
     USE.NAMES = FALSE
   )
   if (!identical(names(data), headers)) {
-    stop("The Excel headers differ from survey_key. Update survey_key.")
+    stop(
+      "The Excel headers differ from survey_key. Update survey_key.",
+      call. = FALSE
+    )
   }
 
   names(data) <- names(survey_key)
@@ -165,15 +169,117 @@ label_survey <- function(data) {
 
 ## add_groups() ----------------------------------------------------------------
 
-# Grouped columns for the decision tree and charts.
+# Grouped columns for the charts, and the answers the decision tree's gates
+# and modifiers read (R/shift_models.R). Thresholds and combinations of
+# questions are settled here, so the trees only list values. A blank answer
+# stays blank (except Q20's), so the decision tree stops on it rather than
+# guess.
 add_groups <- function(data) {
-  # One commute type per person: car beats transit, transit beats walk/bike
-  profiles <- split_modes(data) |>
+  data |>
+    left_join(mode_profiles(data), by = "id") |>
+    mutate(
+      floor_group = factor(
+        case_when(
+          floor <= 0 ~ "Ground or basement",
+          floor <= 2 ~ "1st or 2nd floor",
+          floor <= 4 ~ "3rd or 4th floor",
+          floor > 4 ~ "Above 4th floor"
+        ),
+        levels = c(
+          "Ground or basement",
+          "1st or 2nd floor",
+          "3rd or 4th floor",
+          "Above 4th floor"
+        )
+      ),
+
+      # Gates
+      # [0, 5), [5, 15), [15, Inf), as in the group's diagrams
+      distance_band = case_when(
+        distance_km < 5 ~ "Under 5 km",
+        distance_km < 15 ~ "5 to 15 km",
+        distance_km >= 15 ~ "15 km or more"
+      ),
+      # Figure 1: < 5, 5 to 10, > 10
+      distance_band_brief = case_when(
+        distance_km < 5 ~ "Under 5 km",
+        distance_km <= 10 ~ "5 to 10 km",
+        distance_km > 10 ~ "Over 10 km"
+      ),
+      # Q20: No, ABit or Yes. The 2 blank answers count as No, as in the
+      # diagrams.
+      cycling = coalesce(as.character(urban_cycling), "No"),
+      # Q21: any space at all counts
+      has_parking = !fct_in(bike_parking_home, "No"),
+      parking_home = yes_no(has_parking),
+
+      # Modifiers
+      age_band = if_else(age >= 50, "50 or older", "Under 50"),
+      escort_stop = yes_no(
+        fct_in(intermediate_stop, c("Children", "OlderAdults"))
+      ),
+
+      # tree_v1's Gate 3: Q15, with Q7 to Q11 for children and Q12 for
+      # shopping (on foot or by transit, it's Everything else)
+      escorts_children = fct_in(intermediate_stop, "Children"),
+      shopping = fct_in(intermediate_stop, "Shopping"),
+      under_11 = children_under1 + children_1to5 + children_6to10,
+      over_11 = children_11to15 + children_over15,
+      trip_chain = case_when(
+        is.na(intermediate_stop) ~ NA,
+        escorts_children & is.na(under_11 + over_11) ~ NA,
+        escorts_children & under_11 >= 2 ~ "2+ children under 11",
+        escorts_children & under_11 == 1 ~ "1 child under 11",
+        escorts_children & over_11 > 0 ~ "Only children 11+",
+        # Escorts children but lists none (8 people): as in the diagram
+        escorts_children ~ "1 child under 11",
+        fct_match(intermediate_stop, "OlderAdults") ~ "Escorts older adults",
+        shopping & is.na(private_vehicle) ~ NA,
+        shopping & fct_match(private_vehicle, c("car", "motorbike")) ~
+          "Shopping by car or motorbike",
+        .default = "Everything else"
+      ),
+
+      # Figure 1's compound gates (tree_brief). "Low floor" is the 2nd floor
+      # or below, "car-light" a commute that isn't only by car.
+      low_floor = fct_in(
+        floor_group,
+        c("Ground or basement", "1st or 2nd floor")
+      ),
+      car_light = !fct_in(mode_profile, "Car"),
+      parking_floor_ok = yes_no(has_parking & low_floor),
+      confident_with_parking = case_when(
+        is.na(has_parking) ~ NA,
+        cycling == "Yes" & has_parking ~ "Both",
+        cycling == "Yes" | has_parking ~ "One of the two",
+        .default = "Neither"
+      ),
+      low_floor_not_car_only = yes_no(low_floor & car_light),
+      transit_card_car_light = yes_no(
+        fct_in(transit_card, "Yes") & car_light
+      ),
+
+      # Working columns
+      has_parking = NULL,
+      escorts_children = NULL,
+      shopping = NULL,
+      under_11 = NULL,
+      over_11 = NULL,
+      low_floor = NULL,
+      car_light = NULL
+    )
+}
+
+# One row per id: mode_profile, one commute type per person (car beats
+# transit, transit beats walk/bike), and rail_metro_ferry
+mode_profiles <- function(data) {
+  split_modes(data) |>
     group_by(id) |>
     summarise(
       car = any(mode %in% c("car", "carpool", "motorbike", "taxi")),
       transit = any(mode %in% c("bus", "metro", "rail", "ferry", "shuttle")),
-      active = any(mode %in% c("walk", "bike"))
+      active = any(mode %in% c("walk", "bike")),
+      rail_metro_ferry = yes_no(any(mode %in% c("rail", "metro", "ferry")))
     ) |>
     mutate(
       mode_profile = factor(
@@ -182,7 +288,7 @@ add_groups <- function(data) {
           car ~ "Car",
           transit ~ "Transit",
           active ~ "Walk or bike only",
-          TRUE ~ "Other"
+          .default = "Other"
         ),
         levels = c(
           "Car",
@@ -193,42 +299,16 @@ add_groups <- function(data) {
         )
       )
     ) |>
-    select(id, mode_profile)
+    select(id, mode_profile, rail_metro_ferry)
+}
 
-  data |>
-    left_join(profiles, by = "id") |>
-    mutate(
-      # Gate 3 bands
-      distance_group = cut(
-        distance_km,
-        breaks = c(-Inf, 5, 10, Inf),
-        labels = c("Under 5 km", "5 to 10 km", "Over 10 km"),
-        right = FALSE # 5 km goes into "5 to 10 km"
-      ),
-      # Under-11s often need a school run (modifier)
-      young_children = if_else(
-        children_under1 + children_1to5 + children_6to10 > 0,
-        "Yes",
-        "No"
-      ),
-      # Gates 2a and 3b
-      floor_group = factor(
-        case_when(
-          floor <= 0 ~ "Ground or basement",
-          floor <= 2 ~ "1st or 2nd floor",
-          floor <= 4 ~ "3rd or 4th floor",
-          TRUE ~ "Above 4th floor"
-        ),
-        levels = c(
-          "Ground or basement",
-          "1st or 2nd floor",
-          "3rd or 4th floor",
-          "Above 4th floor"
-        )
-      ),
-      # Gate 1: "A bit" counts as can ride
-      can_ride = if_else(urban_cycling == "No", "Cannot ride", "Can ride")
-    )
+yes_no <- function(x) {
+  if_else(x, "Yes", "No")
+}
+
+# fct_match(), but a blank answer gives NA rather than FALSE
+fct_in <- function(f, values) {
+  if_else(is.na(f), NA, fct_match(f, values))
 }
 
 ## split_modes() ---------------------------------------------------------------

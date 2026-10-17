@@ -1,6 +1,7 @@
 # Chart style ------------------------------------------------------------------
 # Colours, sizes and theme for plots.R.
 
+library(dplyr)
 library(ggplot2)
 
 ## Colours ---------------------------------------------------------------------
@@ -35,7 +36,7 @@ label_size <- 3.3 # values on bars, in mm
 
 # 0.315 -> "32%", and anything under 1% -> "<1%"
 percent_label <- function(x) {
-  ifelse(x > 0 & x < 0.01, "<1%", scales::percent(x, accuracy = 1))
+  if_else(x > 0 & x < 0.01, "<1%", scales::percent(x, accuracy = 1))
 }
 
 ## Theme -----------------------------------------------------------------------

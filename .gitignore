@@ -4,7 +4,7 @@
 .Ruserdata
 .Rproj.user/
 
-# Secrets, if ever set per-project (ORS_API_KEY normally lives in the Keychain)
+# Per-project env vars, if ever needed
 .Renviron
 
 # Render output
@@ -20,3 +20,6 @@ output/
 
 # win11 image
 win11/
+
+# Default device when a script prints a plot under Rscript
+Rplots.pdf

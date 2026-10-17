@@ -1,6 +1,6 @@
 source("renv/activate.R")
 
-# R Debugger settings
+# R Debugger (F5 in VS Code). Only vscDebugger reads these.
 options(
   vsc.groupAttributes = TRUE,
   vsc.convertFactorEntries = TRUE,

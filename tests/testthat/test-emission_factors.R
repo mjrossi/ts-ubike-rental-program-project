@@ -1,13 +1,3 @@
-library(dplyr)
-
-source(test_path("..", "..", "R", "emission_factors.R"))
-
-survey_path <- test_path(
-  "..",
-  "..",
-  "data",
-  "TS_Project_SurveyUBike_final (local).xlsx"
-)
 copert_small <- test_path("fixtures", "copert_small.csv")
 
 # A one-row COPERT file
@@ -43,7 +33,7 @@ test_that("co2_equivalent() weights CH4 by 29.8 and N2O by 273", {
 })
 
 test_that("read_mode_factors() reads the sheet with Q14 labels", {
-  modes <- read_mode_factors(survey_path)
+  modes <- read_mode_factors(workbook_path)
 
   expect_named(modes, c("mode", "co2", "ch4", "n2o", "nox", "pm", "occupancy"))
   expect_setequal(
@@ -115,7 +105,7 @@ test_that("copert_factors() stops when a vehicle is missing", {
 })
 
 test_that("combine_factors() builds the full table", {
-  modes <- read_mode_factors(survey_path)
+  modes <- read_mode_factors(workbook_path)
   vehicles <- copert_factors(copert_small, select(modes, mode, occupancy))
   factors <- combine_factors(modes, vehicles)
 
@@ -137,7 +127,7 @@ test_that("combine_factors() builds the full table", {
 })
 
 test_that("combine_factors() stops when a mode has no factors", {
-  modes <- read_mode_factors(survey_path)
+  modes <- read_mode_factors(workbook_path)
   motorbike_only <- tibble(
     mode = "motorbike",
     fuel = "Petrol",
@@ -154,7 +144,7 @@ test_that("combine_factors() stops when a mode has no factors", {
 })
 
 test_that("combine_factors() stops on duplicate mode and fuel rows", {
-  modes <- read_mode_factors(survey_path)
+  modes <- read_mode_factors(workbook_path)
   vehicles <- copert_factors(copert_small, select(modes, mode, occupancy))
   expect_error(
     combine_factors(modes, bind_rows(vehicles, vehicles[1, ])),

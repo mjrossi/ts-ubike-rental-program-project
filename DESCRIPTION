@@ -2,25 +2,23 @@ Type: project
 Package: ts
 Title: TS Ubike Rental Program Project
 Version: 0.0.1
-Description: Package list for renv (explicit snapshot mode). Everything is
-    under Imports because renv leaves Suggests out of the lockfile. Add
-    packages with `just add <pkg>`.
+Description: The package list for renv. renv is in "explicit" snapshot
+    mode, so renv.lock tracks exactly the packages listed here. Everything is
+    under Imports on purpose: renv treats Suggests as dev-only and leaves them
+    out of the lockfile. Every package here must install as a binary on
+    Windows and macOS, so the group's `renv::restore()` in RStudio never has
+    to compile anything. rmarkdown is for `just render`; desc is for
+    `just add` and `just doctor`. VS Code and nvim tooling (languageserver,
+    vscDebugger, jgd) is installed by `just setup` instead and stays out of
+    the lockfile. Add packages with `just add <pkg>` (or, in RStudio,
+    `renv::install("<pkg>")`, then list it here and run `renv::snapshot()`).
 Depends:
     R (>= 4.6)
 Imports:
-    sf,
-    rmarkdown,
-    openrouteservice,
-    remotes,
-    usethis,
-    osmextract,
-    stplanr,
-    desc,
-    languageserver,
-    vscDebugger,
-    jgd,
     readxl,
     tidyverse,
-    testthat
-Remotes:
-    ManuelHentschel/vscDebugger
+    scales,
+    testthat,
+    rmarkdown,
+    desc
+Config/testthat/edition: 3

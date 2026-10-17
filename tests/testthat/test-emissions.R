@@ -1,9 +1,3 @@
-library(dplyr)
-
-source(test_path("..", "..", "R", "emission_factors.R"))
-source(test_path("..", "..", "R", "survey_codebook.R"))
-source(test_path("..", "..", "R", "emissions.R"))
-
 # Every gas gets the same value, so co2 and co2eq can be checked by hand
 factors <- tibble(
   mode = c("walk", "bus", "car", "car", "motorbike"),

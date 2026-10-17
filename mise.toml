@@ -1,4 +1,4 @@
-# R comes from the r-app cask, since CRAN's prebuilt packages (sf) need CRAN's
+# R comes from the r-app cask, since CRAN's prebuilt packages need CRAN's
 # R build. R packages are pinned in renv.lock.
 
 [tools]
